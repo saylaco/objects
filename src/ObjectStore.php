@@ -33,6 +33,7 @@ class ObjectStore
         $object('beforeCreate');
         $this->observer->run($object, 'create', function (BaseDataModel $object) {
             $this->performCreate($object);
+            $object->clearModifiedAttributeFlags();
             return $object;
         }, 'onObjectCreate');
         $object('afterCreate');
@@ -62,6 +63,7 @@ class ObjectStore
         $object('beforeDelete');
         $this->observer->run($object, 'delete', function (BaseDataModel $object) {
             $this->performDelete($object);
+            $object->clearModifiedAttributeFlags();
             return $object;
         }, 'onObjectDelete');
         $object('afterDelete');
@@ -75,6 +77,7 @@ class ObjectStore
         $newAttributes = $this->getStrategy()->delete($object);
         if (is_iterable($newAttributes)) {
             $object->initStoreData($newAttributes);
+            $object->clearModifiedAttributeFlags();
         }
     }
 

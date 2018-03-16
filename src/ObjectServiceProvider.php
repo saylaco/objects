@@ -3,6 +3,7 @@
 namespace Sayla\Objects;
 
 use Sayla\Objects\Providers\LaravelObjectsBindings;
+use Sayla\Support\Bindings\Laravel\LaravelRegistrar;
 use Sayla\Support\Bindings\Laravel\LaravelServiceProvider;
 use Sayla\Support\Bindings\Registrar;
 
@@ -11,9 +12,10 @@ class ObjectServiceProvider extends LaravelServiceProvider
 {
     protected $stubsPath = null;
 
-    protected function bindingRegistrar(): Registrar
+    protected function bindingRegistrar()
     {
-        return parent::bindingRegistrar()->useSingletons()
+        return parent::bindingRegistrar()
+            ->useSingletons()
             ->setAliasPrefix('sayla.')
             ->setTags(['saylaObjects']);
     }

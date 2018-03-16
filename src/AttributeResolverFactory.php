@@ -5,8 +5,8 @@ namespace Sayla\Objects;
 use Illuminate\Support\Traits\Macroable;
 use ReflectionClass;
 use ReflectionMethod;
+use Sayla\Objects\Contract\AttributeResolver;
 use Sayla\Objects\Resolvers\AliasResolver;
-use Sayla\Objects\Resolvers\AttributeResolver;
 use Sayla\Objects\Resolvers\CallableResolver;
 
 class AttributeResolverFactory
@@ -19,7 +19,7 @@ class AttributeResolverFactory
     /**
      * @param $method
      * @param $parameters
-     * @return \Sayla\Objects\Resolvers\AttributeResolver
+     * @return AttributeResolver
      */
     public function __call($method, $parameters): AttributeResolver
     {

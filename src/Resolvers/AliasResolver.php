@@ -2,10 +2,13 @@
 
 namespace Sayla\Objects\Resolvers;
 
+use Sayla\Objects\Contract\AttributeResolver;
+use Sayla\Objects\DataObject;
 use Sayla\Util\Evaluator;
 
-class AliasResolver extends AttributeResolver
+class AliasResolver implements AttributeResolver
 {
+    use AttributeResolverTrait;
     /** @var string */
     protected $dependsOn;
     /** @var string */
@@ -27,12 +30,17 @@ class AliasResolver extends AttributeResolver
      * @param \Sayla\Objects\DataObject $owningObject
      * @return mixed
      */
-    public function resolve($owningObject)
+    public function resolve(DataObject $owningObject)
     {
         if (isset($this->dependsOn) && !isset($owningObject[$this->dependsOn])) {
             $owningObject[$this->dependsOn];
         }
         return Evaluator::toEval('$object->' . $this->expression, ['object' => $owningObject]);
+    }
+
+    public function resolveMany($objects): array
+    {
+        return $this->resolveManyUsingSingleResolver($objects);
     }
 
     /**

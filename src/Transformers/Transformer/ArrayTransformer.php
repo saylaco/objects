@@ -17,7 +17,7 @@ class ArrayTransformer implements ValueTransformer
     {
         if (empty($value)) {
             return [];
-        } elseif (is_string($value)) {
+        } elseif (is_string($value) && boolval($this->options->get('json'))) {
             return JsonHelper::decode($value, 1);
         }
         return (array)$value;

@@ -8,7 +8,7 @@ use Sayla\Objects\Inspection\ObjectDescriptors;
 
 trait DefinableAttributesTrait
 {
-    protected static $descriptors;
+    private static $descriptors;
     protected $descriptor;
 
     public static function getDefinedAttributes(): array
@@ -47,7 +47,7 @@ trait DefinableAttributesTrait
     }
 
     /**
-     * @param \Sayla\Objects\Inspection\ObjectDescriptor $descriptor
+     * @param string $descriptor
      */
     public function setDescriptor(string $descriptor)
     {

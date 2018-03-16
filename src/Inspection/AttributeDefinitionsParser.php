@@ -3,13 +3,14 @@
 namespace Sayla\Objects\Inspection;
 
 use Illuminate\Support\Str;
-use Sayla\Exception\BadValue;
 use Sayla\Exception\Error;
+use Sayla\Exception\InvalidValue;
+use Sayla\Objects\Contract\AttributeResolver;
 use Sayla\Objects\Resolvers\AliasResolver;
-use Sayla\Objects\Resolvers\AttributeResolver;
 
 class AttributeDefinitionsParser
 {
+    const DEFAULT_ATTRIBUTE_TYPE = 'serial';
     /** @var  callable */
     protected $callback;
     protected $storeDefault = false;
@@ -139,7 +140,7 @@ class AttributeDefinitionsParser
         $transform = array_pull($attribute, 'transform', []);
 
         if (!is_array($transform)) {
-            throw new BadValue('Transform rules must be an array - ' . $descriptor->class . '.' . $attribute['name']);
+            throw new InvalidValue('Transform rules must be an array - ' . $descriptor->class . '.' . $attribute['name']);
         }
 
         if (!isset($transform['type'])) {
@@ -176,10 +177,9 @@ class AttributeDefinitionsParser
     /**
      * @param $properties
      * @param $attributeName
-     * @param string|null $attributeType
      * @return array
      */
-    protected function normalizeProperties($properties, $attributeName, string $attributeType = null): array
+    protected function normalizeProperties($properties, $attributeName): array
     {
         if ($properties instanceof AttributeResolver) {
             $properties = ['resolver' => $properties];
@@ -188,20 +188,16 @@ class AttributeDefinitionsParser
             $attributeName = (string)$properties;
             $properties = [];
         }
+        $defaultAttributeType = self::DEFAULT_ATTRIBUTE_TYPE;
         if (str_contains($attributeName, ':')) {
             [$properties['name'], $defaultAttributeType] = explode(':', trim($attributeName), 2);
         } else {
-            $defaultAttributeType = 'string';
             if (!isset($properties['name'])) {
                 $properties['name'] = $attributeName;
             }
         }
         if (!isset($properties['type'])) {
-            if ($attributeType === null) {
-                $properties['type'] = $defaultAttributeType;
-            } else {
-                $properties['type'] = $attributeType;
-            }
+            $properties['type'] = $defaultAttributeType;
         }
         if (empty($properties['transform'])
             || (!empty($properties['transform']) && !isset($properties['transform']['type']))) {
@@ -273,7 +269,7 @@ class AttributeDefinitionsParser
      * @param \Sayla\Objects\Inspection\ObjectDescriptor $descriptor
      * @param \ReflectionClass $reflection
      * @param array $attribute
-     * @param \Sayla\Objects\Resolvers\AttributeResolver|null $resolver
+     * @param \Sayla\Objects\Contract\AttributeResolver|null $resolver
      * @return array
      * @throws \Sayla\Exception\Error
      */

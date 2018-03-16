@@ -29,6 +29,7 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
     private $aliases = [];
     private $resolving = false;
     private $setObjectProperties = false;
+    private $modifiedAttributes = [];
 
     /**
      * @param array $attributes
@@ -88,13 +89,23 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
     }
 
     /**
+     * @param string $name
+     * @param iterable $attributes
+     * @return \Sayla\Objects\DataObject|static
+     */
+    public static function makeObject(string $name, iterable $attributes = []): DataObject
+    {
+        return self::getDescriptors()->makeObject($name, $attributes);
+    }
+
+    /**
      * @param string $objectClass
      * @return \Sayla\Objects\ObjectCollection|static[]
      */
     public static function newObjectCollection(string $objectClass = null)
     {
         if (empty($objectClass)) {
-            return ObjectCollection::makeObjectCollection(static::class);
+            $objectClass = static::class;
         }
         return (new $objectClass)->newCollection();
     }
@@ -246,6 +257,9 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
 
     protected function setAttributeValue(string $attributeName, $value): void
     {
+        if ($this->isTrackingModifiedAttributes()) {
+            $this->modifiedAttributes[$attributeName] = $attributeName;
+        }
         parent::setAttributeValue($attributeName, $this->runSetFilters($attributeName, $value));
     }
 
@@ -367,16 +381,6 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
     }
 
     /**
-     * @param string $name
-     * @param iterable $attributes
-     * @return \Sayla\Objects\DataObject|static
-     */
-    public static function makeObject(string $name, iterable $attributes = []): DataObject
-    {
-        return self::getDescriptors()->makeObject($name, $attributes);
-    }
-
-    /**
      * @return array
      */
     protected function realSerializableProperties(): array
@@ -386,6 +390,19 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
         $properties['attributes'] = array_except($this->toArray(), $aliases);
         $properties['initializing'] = $this->initializing;
         return $properties;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isInitializing(): bool
+    {
+        return $this->initializing;
+    }
+
+    public function isResolving(): bool
+    {
+        return $this->resolving;
     }
 
     public function __invoke(string $name, ...$arguments)
@@ -453,6 +470,22 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
     }
 
     /**
+     * @return mixed[]
+     */
+    public function getModifiedAttributeNames(): array
+    {
+        return $this->modifiedAttributes;
+    }
+
+    /**
+     * @return mixed[]
+     */
+    public function getModifiedAttributes(): array
+    {
+        return array_only($this->toArray(), $this->modifiedAttributes);
+    }
+
+    /**
      * Fill the object with an array of attributes.
      *
      * @param  array|\Traversable $attributes
@@ -490,14 +523,9 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
     /**
      * @return bool
      */
-    public function isInitializing(): bool
+    protected function isTrackingModifiedAttributes(): bool
     {
-        return $this->initializing;
-    }
-
-    public function isResolving(): bool
-    {
-        return $this->resolving;
+        return !$this->isInitializing() && !$this->isResolving();
     }
 
     /**
@@ -560,5 +588,10 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
     public function trigger(string $name, ...$arguments)
     {
         return $this->fireTriggers($name, $arguments);
+    }
+
+    public function clearModifiedAttributeFlags()
+    {
+        $this->modifiedAttributes = [];
     }
 }

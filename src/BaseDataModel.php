@@ -134,6 +134,13 @@ abstract class BaseDataModel extends DataObject implements Keyable, Storable
         $instance->storing = false;
         return $instance;
     }
+    /**
+     * @return bool
+     */
+    protected function isTrackingModifiedAttributes(): bool
+    {
+        return parent::isTrackingModifiedAttributes() && !$this->isStoring();
+    }
 
     public function delete()
     {

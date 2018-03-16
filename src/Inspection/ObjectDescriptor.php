@@ -240,7 +240,10 @@ class ObjectDescriptor
         if ($storeAttrNames != $objectAttrNames) {
             $renamedAttributes = [];
             foreach ($storeAttrNames as $i => $storeAttrName) {
-                $renamedAttributes[$objectAttrNames[$i]] = data_get($attributes, $storeAttrName);
+                $value = data_get($attributes, $storeAttrName);
+                if ($value !== null) {
+                    $renamedAttributes[$objectAttrNames[$i]] = $value;
+                }
             }
             return $renamedAttributes;
         }
@@ -258,7 +261,7 @@ class ObjectDescriptor
      * @return array
      * @throws \ErrorException
      */
-    public function remapAttributesForStore(AttributableObject $object): array
+    public function remapAttributesForStore(AttributableObject $object, array $attributeList = null): array
     {
         $attributes = $this->getPersistentAttributes($object);
         $values = [];
@@ -269,6 +272,7 @@ class ObjectDescriptor
             if (isset($options->aliasOf)) continue;
             $objectProperty = $options->name;
             if (!$this->definitions[$objectProperty]['store']) continue;
+            if (isset($attributeList) && !in_array($objectProperty, $attributeList)) continue;
             $recordProperty = $this->definitions[$objectProperty]['storeAs'];
             if (!isset($attributes[$objectProperty])) {
                 if ($this->hasDefaultValue($objectProperty)) {
@@ -367,10 +371,10 @@ class ObjectDescriptor
             $singleResolver = $this->getSingleResolver($attributeName);
             $values = [];
             foreach ($objects as $i => $object) {
-                $values[] = call_user_func($singleResolver, $object);
+                $values[$i] = call_user_func($singleResolver, $object);
             }
             return $values;
         }
-        return array_fill(0, count($objects), null);
+        return array_combine($objects->keys()->all(), array_fill(0, count($objects), null));
     }
 }

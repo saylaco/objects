@@ -78,4 +78,12 @@ trait ImmutableDataObjectTrait
     {
         parent::setAttributeValue($attributeName, $value);
     }
+
+    /**
+     * @return mixed[]
+     */
+    public function getModifiedAttributes(): array
+    {
+        return array_only($this->workingAttributes, $this->getModifiedAttributeNames());
+    }
 }
