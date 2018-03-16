@@ -1,0 +1,40 @@
+{
+  "name": "sayla/objects",
+  "keywords": [
+    "sayla",
+    "laravel",
+    "objects"
+  ],
+  "require": {
+    "myclabs/deep-copy": "^1.6",
+    "sayla/utils": "dev-master",
+    "sayla/bindings": "dev-master"
+  },
+  "require-dev": {
+  },
+  "autoload": {
+    "files": [
+      "helpers.php"
+    ],
+    "psr-4": {
+      "Sayla\\Objects\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\": "tests/"
+    }
+  },
+  "suggest": {
+    "sabre/xml": "Install to utilize XmlStrategy",
+    "illuminate/validation": "Install to utilize ValidationBuilder"
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Sayla\\Objects\\ObjectServiceProvider"
+      ]
+    }
+  },
+  "minimum-stability": "dev"
+}
