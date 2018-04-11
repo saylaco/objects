@@ -203,4 +203,9 @@ class ObjectCollection extends Collection
     {
         return $this->map->toScalarArray()->toBase();
     }
+
+    public function groupBy($groupBy, $preserveKeys = false)
+    {
+        return parent::groupBy($groupBy, $preserveKeys)->toBase();
+    }
 }

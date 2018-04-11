@@ -203,8 +203,18 @@ class AttributeDefinitionsParser
             || (!empty($properties['transform']) && !isset($properties['transform']['type']))) {
             $properties['transform']['type'] = $properties['type'];
         }
+        if (isset($properties['mapFrom'])) {
+            $properties['storeAs'] = $properties['mapFrom'];
+            $properties['store'] = false;
+        }
         if (!isset($properties['store'])) {
             $properties['store'] = (!empty($properties['storeAs'])) ? true : $this->storeDefault;
+        }
+        foreach ($properties as $k => $v) {
+            if (str_contains($k, '.')) {
+                unset($properties[$k]);
+                array_set($properties, $k, $v);
+            }
         }
         return $properties;
     }

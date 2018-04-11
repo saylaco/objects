@@ -11,6 +11,8 @@ class ValueFactory
     /** @var \Psr\Container\ContainerInterface */
     protected $container;
     /** @var string[] */
+    private static $sharedTransformerClasses = [];
+    /** @var string[] */
     protected $transformerClasses = [];
 
     public function __construct(array $transformerClasses)
@@ -60,6 +62,23 @@ class ValueFactory
         return $this;
     }
 
+    /**
+     * @param string $valueTransformerClass
+     * @param string|null $typeName
+     * @return $this
+     * @throws \Sayla\Exception\Error
+     */
+    public static function shareType(string $valueTransformerClass, string $typeName = null)
+    {
+        if (blank($typeName)) {
+            $typeName = lcfirst(class_basename($valueTransformerClass));
+        }
+        if (isset(self::$sharedTransformerClasses[$typeName])) {
+            throw new Error('Transformer type is already shared: ' . $typeName);
+        }
+        self::$sharedTransformerClasses[$typeName] = $valueTransformerClass;
+    }
+
     public function getTransformer($type, $options = null): ValueTransformer
     {
         $transformerClass = $this->getTransformerClass($type);
@@ -84,8 +103,11 @@ class ValueFactory
      */
     public function getTransformerClass(string $type): string
     {
-        if ($this->isSupportedType($type)) {
+        if ($this->isInstanceType($type)) {
             return $this->transformerClasses[$type];
+        }
+        if (self::isSharedType($type)) {
+            return self::$sharedTransformerClasses[$type];
         }
         if (ends_with($type, 'Stamp')) {
             return DatetimeTransformer::class;
@@ -99,7 +121,25 @@ class ValueFactory
      */
     public function isSupportedType(string $type): bool
     {
+        return  $this->isInstanceType($type) || self::isSharedType($type);
+    }
+
+    /**
+     * @param string $type
+     * @return bool
+     */
+    public function isInstanceType(string $type): bool
+    {
         return isset($this->transformerClasses[$type]);
+    }
+
+    /**
+     * @param string $type
+     * @return bool
+     */
+    public static function isSharedType(string $type): bool
+    {
+        return isset(self::$sharedTransformerClasses[$type]);
     }
 
     /**

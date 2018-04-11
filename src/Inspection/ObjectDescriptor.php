@@ -32,7 +32,6 @@ class ObjectDescriptor
     public $labels = [];
     public $defaults = [];
     public $relations = [];
-    public $aliases = [];
     public $getFilters = [];
     public $setFilters = [];
     /** @var array */
@@ -52,15 +51,6 @@ class ObjectDescriptor
     {
         $this->name = $name;
         $this->class = $class ?? DataObject::class;
-    }
-
-    /**
-     * @param string $aliasName
-     * @return array
-     */
-    public function getAlias(string $aliasName): array
-    {
-        return $this->aliases[$aliasName];
     }
 
     public function getAttributeNames()
@@ -142,11 +132,6 @@ class ObjectDescriptor
     public function hasResolver(string $attributeName)
     {
         return $this->resolvesMany[$attributeName] != false || $this->resolves[$attributeName] != false;
-    }
-
-    public function isAlias($attributeName)
-    {
-        return isset($this->aliases[$attributeName]);
     }
 
     public function isHidden(string $attributeName)
@@ -268,10 +253,10 @@ class ObjectDescriptor
         $transformer = $this->getStoreTransformer()->skipNonAttributes()->skipObjectSmashing();
         $optionsMap = $transformer->getAttributeOptions();
         foreach ($optionsMap as $persistableName => $options) {
+            if (empty($this->definitions[$options->name]['store'])) continue;
             if (isset($options->aliasOf) || $options->type == 'relation') continue;
             if (isset($options->aliasOf)) continue;
             $objectProperty = $options->name;
-            if (!$this->definitions[$objectProperty]['store']) continue;
             if (isset($attributeList) && !in_array($objectProperty, $attributeList)) continue;
             $recordProperty = $this->definitions[$objectProperty]['storeAs'];
             if (!isset($attributes[$objectProperty])) {
@@ -301,7 +286,7 @@ class ObjectDescriptor
      */
     public function getPersistentAttributes(AttributableObject $object)
     {
-        $keys = array_merge(array_keys($this->aliases), $this->nonPersistentAttributes);
+        $keys = $this->nonPersistentAttributes;
         $attributes = $object->toArray();
         return count($keys) > 0 ? array_except($attributes, $keys) : $attributes;
     }

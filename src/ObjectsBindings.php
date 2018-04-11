@@ -30,9 +30,6 @@ class ObjectsBindings extends BindingProvider
                 AttributeResolverFactory::class,
                 function () {
                     return new AttributeResolverFactory();
-                },
-                function (ContainerInterface $container) {
-                    DataObject::setResolverFactory($container->get(AttributeResolverFactory::class));
                 }
             ],
             'transformerValues' => [

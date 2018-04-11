@@ -14,16 +14,23 @@ use Sayla\Objects\Validation\ValidationBuilder;
 
 class LaravelObjectsBindings extends ObjectsBindings
 {
-    protected $stubsPath;
-    private $bootValidationFactory = false;
-
     public function booting()
     {
-        if ($this->bootValidationFactory) {
+        if ($bootValidationFactory = $this->option('bootValidationFactory')) {
+            $bootValidationFactory = is_bool($bootValidationFactory)
+                ? \Illuminate\Contracts\Validation\Factory::class
+                : $bootValidationFactory;
             ValidationBuilder::setSharedValidationFactory(
-                \Illuminate\Container\Container::getInstance()->make(\Illuminate\Contracts\Validation\Factory::class)
+                \Illuminate\Container\Container::getInstance()->make($bootValidationFactory)
             );
         }
+    }
+
+    protected function configureOptions($optionsResolver): void
+    {
+        $optionsResolver->setDefaults(['bootValidationFactory' => true, 'stubsPath' => null]);
+        $optionsResolver->setAllowedTypes('bootValidationFactory', ['boolean', 'string']);
+        $optionsResolver->setAllowedTypes('stubsPath', 'string');
     }
 
     /**
@@ -56,8 +63,9 @@ class LaravelObjectsBindings extends ObjectsBindings
                         $app->make(FakerGenerator::class),
                         $app->make(ObjectDescriptors::class)
                     );
-                    if ($this->stubsPath != null) {
-                        $stubFactory->load($this->stubsPath);
+
+                    if (filled($stubsPath = $this->option('stubsPath'))) {
+                        $stubFactory->load($stubsPath);
                     }
                     return $stubFactory;
                 }
@@ -71,7 +79,7 @@ class LaravelObjectsBindings extends ObjectsBindings
      */
     public function setBootValidationFactory(bool $shouldBoot)
     {
-        $this->bootValidationFactory = $shouldBoot;
+        $this->setOption('bootValidationFactory', $shouldBoot);
         return $this;
     }
 
@@ -81,7 +89,7 @@ class LaravelObjectsBindings extends ObjectsBindings
      */
     public function setStubsPath(string $laravelStubsPath)
     {
-        $this->stubsPath = $laravelStubsPath;
+        $this->setOption('stubsPath', $laravelStubsPath);
         return $this;
     }
 

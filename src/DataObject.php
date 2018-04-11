@@ -12,7 +12,6 @@ use Sayla\Objects\Contract\Attributable;
 use Sayla\Objects\Exception\HydrationError;
 use Sayla\Objects\Exception\InaccessibleAttribute;
 use Sayla\Objects\Exception\UndefinedAttribute;
-use Sayla\Objects\Resolvers\AliasResolver;
 use Sayla\Objects\Transformers\Transformer;
 
 class DataObject extends AttributableObject implements \Serializable, Attributable
@@ -24,9 +23,7 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
     protected static $transformUndefinedAttributes = false;
     /** @var  \Sayla\Objects\Transformers\Transformer */
     protected static $transformer;
-    private static $resolverFactory;
     private $initializing = false;
-    private $aliases = [];
     private $resolving = false;
     private $setObjectProperties = false;
     private $modifiedAttributes = [];
@@ -83,11 +80,6 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
         return static::class;
     }
 
-    public static function isTransformable(string $attributeName): bool
-    {
-        return isset(static::getDescriptor()->transformations[$attributeName]);
-    }
-
     /**
      * @param string $name
      * @param iterable $attributes
@@ -108,14 +100,6 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
             $objectClass = static::class;
         }
         return (new $objectClass)->newCollection();
-    }
-
-    /**
-     * @param \Sayla\Objects\AttributeResolverFactory $factory
-     */
-    public static function setResolverFactory(AttributeResolverFactory $factory)
-    {
-        self::$resolverFactory = $factory;
     }
 
     public static function transformWith(Transformer $transformer, callable $callback)
@@ -206,9 +190,6 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
 
     protected function isRetrievableAttribute(string $attributeName)
     {
-        if ($this->isLocalAlias($attributeName)) {
-            return true;
-        }
         return parent::isRetrievableAttribute($attributeName) || $this->isAttributeReadable($attributeName);
     }
 
@@ -284,7 +265,7 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
         if (!$this->descriptor()->isAttribute($attributeName) && $getterMethodExists) {
             return $this->$getterMethod();
         }
-        if (!$this->isAttributeReadable($attributeName) && !$this->isLocalAlias($attributeName)) {
+        if (!$this->isAttributeReadable($attributeName)) {
             throw new InaccessibleAttribute(static::class, $attributeName, 'Not readable');
         }
         $value = $this->getAttributeValue($attributeName);
@@ -307,18 +288,9 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
         return $this->descriptor()->isReadable($attributeName);
     }
 
-    /**
-     * @param string $attributeName
-     * @return bool
-     */
-    protected function isLocalAlias(string $attributeName): bool
-    {
-        return isset($this->aliases[$attributeName]);
-    }
-
     protected function setGuardedAttributeValue(string $attributeName, $value)
     {
-        if (!$this->isAttributeWritable($attributeName) && !$this->isLocalAlias($attributeName)) {
+        if (!$this->isAttributeWritable($attributeName)) {
             throw new InaccessibleAttribute(static::class, $attributeName, 'Not writable');
         }
         $this->setAttributeValue($attributeName, $value);
@@ -346,22 +318,11 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
         if ($this->descriptor()->hasDefaultValue($attributeName)) {
             $value = $this->descriptor()->getDefaultValue($attributeName);
         } else {
-            if ($this->isLocalAlias($attributeName)) {
-                $value = $this->getAliasValue($attributeName);
-            } else {
-                $value = $this->descriptor()->resolveValue($attributeName, $this);
-            }
+            $value = $this->descriptor()->resolveValue($attributeName, $this);
         }
         $this->setRawAttribute($attributeName, $value);
         $this->resolving = false;
         return $value;
-    }
-
-    protected function getAliasValue(string $aliasName)
-    {
-        /** @var \Sayla\Objects\Resolvers\AliasResolver $aliasResolver */
-        $aliasResolver = $this->aliases[$aliasName];
-        return $aliasResolver->resolve($this);
     }
 
     /**
@@ -386,8 +347,7 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
     protected function realSerializableProperties(): array
     {
         $properties = [];
-        $aliases = array_keys(array_merge($this->descriptor()->aliases, $this->aliases));
-        $properties['attributes'] = array_except($this->toArray(), $aliases);
+        $properties['attributes'] = $this->toArray();
         $properties['initializing'] = $this->initializing;
         return $properties;
     }
@@ -408,37 +368,6 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
     public function __invoke(string $name, ...$arguments)
     {
         return $this->fireTriggers($name, $arguments);
-    }
-
-    /**
-     * @param string $aliasName
-     * @param string|null $dependencyAttribute
-     * @param string|null $expression
-     * @return \Sayla\Objects\Resolvers\AliasResolver
-     */
-    protected function addAlias(string $aliasName, string $dependencyAttribute = null,
-                                string $expression = null): AliasResolver
-    {
-        if ($expression == null && $dependencyAttribute == null) {
-            $expression = $aliasName . '()';
-        } elseif ($expression == null) {
-            $expression = $dependencyAttribute;
-            $dependencyAttribute = null;
-        }
-        $aliasResolver = self::resolver()->alias($expression);
-        if ($dependencyAttribute) {
-            $aliasResolver->setDependsOn($dependencyAttribute);
-        }
-        $this->aliases[$aliasName] = $aliasResolver;
-        return $aliasResolver;
-    }
-
-    /**
-     * @return \Sayla\Objects\AttributeResolverFactory
-     */
-    public static function resolver(): AttributeResolverFactory
-    {
-        return self::$resolverFactory;
     }
 
     /**

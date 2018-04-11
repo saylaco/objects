@@ -26,9 +26,9 @@ class AttributeResolverFactory
         return $this->callMacro($method, $parameters);
     }
 
-    public function alias(string $expression)
+    public function alias(string $expression, string $dependsOn = null)
     {
-        return new AliasResolver($expression);
+        return new AliasResolver($expression, $dependsOn);
     }
 
     public function callable($callable)
@@ -37,7 +37,7 @@ class AttributeResolverFactory
     }
 
     /**
-     * Mix in methods matching "^resolve(\w+)Type$"
+     * Mix in methods matching "^get(\w+)AttributeResolver$"
      *
      * @param  object $mixin
      * @return void
@@ -47,8 +47,9 @@ class AttributeResolverFactory
         $methods = (new ReflectionClass($mixin))->getMethods(ReflectionMethod::IS_PUBLIC);
 
         foreach ($methods as $method) {
-            if (starts_with($method->name, 'resolve') && ends_with($method->name, 'Type')) {
-                static::macro(lcfirst(substr($method->name, 7, -4)), [$mixin, $method->name]);
+            if (starts_with($method->name, 'get') && ends_with($method->name, 'AttributeResolver')) {
+                $macroName = lcfirst(str_before(substr($method->name, 3), 'AttributeResolver'));
+                static::macro($macroName, [$mixin, $method->name]);
             }
         }
     }

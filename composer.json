@@ -7,8 +7,8 @@
   ],
   "require": {
     "myclabs/deep-copy": "^1.6",
-    "sayla/utils": "dev-master",
-    "sayla/bindings": "dev-master"
+    "sayla/utils": "master",
+    "sayla/bindings": "master"
   },
   "require-dev": {
   },

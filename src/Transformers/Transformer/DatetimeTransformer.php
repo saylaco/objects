@@ -53,9 +53,9 @@ class DatetimeTransformer implements ValueTransformer
         } elseif (is_string($value) && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value)) {
             return $this->newDateObject($value, 'Y-m-d');
         } elseif (($timestamp = strtotime($value)) !== false) {
-            return Carbon::createFromTimestamp($timestamp);
+            return $this->newDateFromTimestamp($timestamp);
         }
-        return $this->newDateObject($value, $this->options->get('format'), $this->options->get('timezone'));
+        return $this->newDateObject($value, $this->options->get('format'));
     }
 
     public function getScalarType(): ?string
@@ -69,7 +69,6 @@ class DatetimeTransformer implements ValueTransformer
      */
     public function smash($value)
     {
-        $timeZone = $this->options->get('timezone');
         $format = $this->options->get('format', 'Y-m-d H:i:s');
         if (empty($value) && !$this->options->auto) {
             return null;
@@ -79,7 +78,7 @@ class DatetimeTransformer implements ValueTransformer
         if ($value instanceof \DateTime) {
             $datetime = $value;
         } elseif (is_string($value)) {
-            $datetime = Carbon::parse($value, $timeZone);
+            $datetime = Carbon::parse($value, $this->normalizeTimezone());
         } elseif (is_numeric($value)) {
             $datetime = $this->newDateFromTimestamp($value);
         } elseif (is_string($value) && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value)) {
@@ -104,8 +103,8 @@ class DatetimeTransformer implements ValueTransformer
     protected function newDateObject($value = null, $format = null, $timezone = null)
     {
         if ($value instanceof Carbon) return $value;
-        if ($format) return Carbon::createFromFormat($format, $value, $timezone ?: static::$defaultTimezone);
-        if ($value) return Carbon::parse($value, $timezone);
+        if ($format) return Carbon::createFromFormat($format, $value, $this->normalizeTimezone($timezone));
+        if ($value) return Carbon::parse($value, $this->normalizeTimezone($timezone));
         return new Carbon;
     }
 
@@ -116,7 +115,7 @@ class DatetimeTransformer implements ValueTransformer
      */
     protected function newDateFromTimestamp($value, $timezone = null)
     {
-        return Carbon::createFromTimestamp($value, $timezone ?: static::$defaultTimezone);
+        return Carbon::createFromTimestamp($value, $this->normalizeTimezone($timezone));
     }
 
     /**
@@ -128,5 +127,14 @@ class DatetimeTransformer implements ValueTransformer
     protected function newDateFromFormat($value, $format)
     {
         return $this->newDateObject($value, $format);
+    }
+
+    /**
+     * @param $timezone
+     * @return mixed|null
+     */
+    protected function normalizeTimezone($timezone)
+    {
+        return $timezone ?? $this->options->get('timezone') ?? static::$defaultTimezone;
     }
 }
