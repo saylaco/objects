@@ -2,27 +2,22 @@
 
 namespace Sayla\Objects;
 
-use DeepCopy\DeepCopy;
-use DeepCopy\Filter\SetNullFilter;
-use DeepCopy\Matcher\PropertyNameMatcher;
-use DeepCopy\TypeFilter\ReplaceFilter;
-use DeepCopy\TypeMatcher\TypeMatcher;
-use Sayla\Helper\Data\StandardObject;
 use Sayla\Objects\Contract\Attributable;
-use Sayla\Objects\Exception\HydrationError;
+use Sayla\Objects\Contract\NonCachableAttribute;
+use Sayla\Objects\Contract\SupportsDataType;
+use Sayla\Objects\Contract\SupportsDataTypeManager;
+use Sayla\Objects\Contract\SupportsObjectDescriptorTrait;
+use Sayla\Objects\Contract\Triggerable;
+use Sayla\Objects\Contract\TriggerableTrait;
 use Sayla\Objects\Exception\InaccessibleAttribute;
-use Sayla\Objects\Exception\UndefinedAttribute;
-use Sayla\Objects\Transformers\Transformer;
 
-class DataObject extends AttributableObject implements \Serializable, Attributable
+class DataObject extends AttributableObject
+    implements \Serializable, Attributable, SupportsDataType, SupportsDataTypeManager, Triggerable
 {
-    use DefinableAttributesTrait;
+    use SupportsObjectDescriptorTrait;
     use TriggerableTrait;
     const TRIGGER_PREFIX = '__';
     protected static $unguarded = false;
-    protected static $transformUndefinedAttributes = false;
-    /** @var  \Sayla\Objects\Transformers\Transformer */
-    protected static $transformer;
     private $initializing = false;
     private $resolving = false;
     private $setObjectProperties = false;
@@ -33,7 +28,9 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
      */
     public function __construct($attributes = null)
     {
-        $this->init($attributes ?? []);
+        if ($attributes !== null) {
+            $this->init($attributes);
+        }
     }
 
     /**
@@ -43,7 +40,6 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
     final public function init(iterable $attributes): self
     {
         $this->initializing = true;
-        $this->setAttributes($this->descriptor()->getDefaultValues());
         $this->initialize($attributes);
         $this->initializing = false;
         return $this;
@@ -75,41 +71,12 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
         return $value;
     }
 
-    protected static function determineObjectClass($attributes = [])
+    public static function newObjectCollection()
     {
-        return static::class;
-    }
-
-    /**
-     * @param string $name
-     * @param iterable $attributes
-     * @return \Sayla\Objects\DataObject|static
-     */
-    public static function makeObject(string $name, iterable $attributes = []): DataObject
-    {
-        return self::getDescriptors()->makeObject($name, $attributes);
-    }
-
-    /**
-     * @param string $objectClass
-     * @return \Sayla\Objects\ObjectCollection|static[]
-     */
-    public static function newObjectCollection(string $objectClass = null)
-    {
-        if (empty($objectClass)) {
-            $objectClass = static::class;
+        if (self::getDataTypeManager()->has(static::class)) {
+            return self::getDataTypeManager()->get(static::class)->newCollection();
         }
-        return (new $objectClass)->newCollection();
-    }
-
-    public static function transformWith(Transformer $transformer, callable $callback)
-    {
-        static::$transformer = $transformer;
-        try {
-            return $callback();
-        } finally {
-            static::$transformer = null;
-        }
+        return ObjectCollection::make(static::class);
     }
 
     public static function unguarded(callable $callback)
@@ -146,14 +113,6 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
         static::$unguarded = false;
     }
 
-    public function __call($name, $arguments)
-    {
-        if (starts_with($name, self::TRIGGER_PREFIX)) {
-            return $this->fireTriggers(substr($name, 2), $arguments);
-        }
-        throw new \BadMethodCallException('Method does not exist - ' . static::class . '::' . $name);
-    }
-
     public function __get($name)
     {
         if (starts_with($name, self::TRIGGER_PREFIX)) {
@@ -182,31 +141,20 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
 
     protected function getAttributeValue(string $attributeName)
     {
-        if (!$this->isAttributeSet($attributeName)) {
+        if (!$this->isAttributeSet($attributeName) && $this->descriptor()->hasResolver($attributeName)) {
             $this->resolveAttributeValue($attributeName);
         }
-        return $this->runGetFilters($attributeName, parent::getAttributeValue($attributeName));
+        $value = $this->getRawAttribute($attributeName);
+        $value = $this->runGetFilters($attributeName, $value);
+        if ($this->hasAttributeGetter($attributeName)) {
+            return $this->{$this->getAttributeGetter($attributeName)}($value);
+        }
+        return $value;
     }
 
     protected function isRetrievableAttribute(string $attributeName)
     {
         return parent::isRetrievableAttribute($attributeName) || $this->isAttributeReadable($attributeName);
-    }
-
-    /**
-     * @param $attributes
-     * @return static
-     * @throws \Sayla\Exception\Error
-     */
-    final public static function make($attributes = [])
-    {
-        try {
-            $object = self::getDescriptors()->makeObject(static::class, $attributes);
-        } catch (\Throwable $exception) {
-            throw (new HydrationError(static::class . ' - ' . $exception->getMessage(), $exception))
-                ->withErrorLog($exception);
-        }
-        return $object;
     }
 
     public function offsetGet($offset)
@@ -260,34 +208,17 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
 
     protected function getGuardedAttributeValue(string $attributeName)
     {
-        $getterMethod = 'get' . ucfirst($attributeName) . 'Attribute';
-        $getterMethodExists = method_exists($this, $getterMethod);
-        if (!$this->descriptor()->isAttribute($attributeName) && $getterMethodExists) {
-            return $this->$getterMethod();
-        }
-        if (!$this->isAttributeReadable($attributeName)) {
+        if (!$this->isRetrievableAttribute($attributeName)) {
             throw new InaccessibleAttribute(static::class, $attributeName, 'Not readable');
         }
-        $value = $this->getAttributeValue($attributeName);
-
-        if ($getterMethodExists) {
-            $value = $this->$getterMethod($value);
-        }
-        return $value;
+        return $this->getAttributeValue($attributeName);
     }
 
     /**
      * @param string $attributeName
-     * @return bool
+     * @param $value
+     * @throws \Sayla\Objects\Exception\InaccessibleAttribute
      */
-    public function isAttributeReadable(string $attributeName): bool
-    {
-        if (static::$unguarded) {
-            return true;
-        }
-        return $this->descriptor()->isReadable($attributeName);
-    }
-
     protected function setGuardedAttributeValue(string $attributeName, $value)
     {
         if (!$this->isAttributeWritable($attributeName)) {
@@ -310,17 +241,22 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
 
     /**
      * @param string $attributeName
-     * @return mixed|null
+     * @return mixed
+     * @throws \Sayla\Objects\Exception\AttributeResolverNotFound
      */
     protected function resolveAttributeValue(string $attributeName)
     {
         $this->resolving = true;
-        if ($this->descriptor()->hasDefaultValue($attributeName)) {
-            $value = $this->descriptor()->getDefaultValue($attributeName);
+        if (!$this->descriptor()->hasResolver($attributeName)) {
+            $value = null;
+            $this->setRawAttribute($attributeName, $value);
         } else {
-            $value = $this->descriptor()->resolveValue($attributeName, $this);
+            $resolver = $this->descriptor()->getResolver($attributeName);
+            $value = $resolver->resolve($this);
+            if (!($resolver instanceof NonCachableAttribute)) {
+                $this->setRawAttribute($attributeName, $value);
+            }
         }
-        $this->setRawAttribute($attributeName, $value);
         $this->resolving = false;
         return $value;
     }
@@ -342,6 +278,18 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
     }
 
     /**
+     * @param string $attributeName
+     * @return bool
+     */
+    public function isAttributeReadable(string $attributeName): bool
+    {
+        if (static::$unguarded) {
+            return true;
+        }
+        return $this->descriptor()->isReadable($attributeName);
+    }
+
+    /**
      * @return array
      */
     protected function realSerializableProperties(): array
@@ -350,6 +298,14 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
         $properties['attributes'] = $this->toArray();
         $properties['initializing'] = $this->initializing;
         return $properties;
+    }
+
+    /**
+     * @return bool
+     */
+    protected function isTrackingModifiedAttributes(): bool
+    {
+        return !$this->isInitializing() && !$this->isResolving();
     }
 
     /**
@@ -365,37 +321,9 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
         return $this->resolving;
     }
 
-    public function __invoke(string $name, ...$arguments)
+    public function clearModifiedAttributeFlags()
     {
-        return $this->fireTriggers($name, $arguments);
-    }
-
-    /**
-     * @return \DeepCopy\DeepCopy
-     */
-    public function getCopier(): \DeepCopy\DeepCopy
-    {
-        $copier = new DeepCopy();
-        $copier->skipUncloneable(true);
-        $copier->addTypeFilter(new ReplaceFilter(function (self $value) {
-            return $value->getCopy();
-        }), new TypeMatcher(self::class));
-        foreach ($this->descriptor()->getKeys() as $key)
-            $copier->addFilter(new SetNullFilter, new PropertyNameMatcher($key));
-        foreach (array_keys($this->aliases) as $key) {
-            $copier->addFilter(new SetNullFilter, new PropertyNameMatcher($key));
-        }
-        return $copier;
-    }
-
-    /**
-     * @return static
-     * @throws \Sayla\Exception\Error
-     */
-    public function getCopy()
-    {
-        $simpleObject = $this->getCopier()->copy(StandardObject::make($this->toArray()));
-        return static::make((array)$simpleObject);
+        $this->modifiedAttributes = [];
     }
 
     /**
@@ -415,77 +343,13 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
     }
 
     /**
-     * Fill the object with an array of attributes.
-     *
-     * @param  array|\Traversable $attributes
-     * @return $this
-     */
-    public function initStoreData($attributes)
-    {
-        $attributes = $this->getTransformer()->buildOnly($attributes, $this);
-        return $this->init($attributes);
-    }
-
-    /**
-     * @return Transformer
-     */
-    public function getTransformer(): Transformer
-    {
-        if (isset(static::$transformer)) {
-            return static::$transformer;
-        }
-        $transformer = $this->descriptor()->getTransformer();
-        $transformer->skipNonAttributes(static::$transformUndefinedAttributes);
-        return $transformer;
-    }
-
-    /**
-     * @param $attributes
-     */
-    public function initializeAttributeValues($attributes): void
-    {
-        $this->initializing = true;
-        $this->initialize($attributes);
-        $this->initializing = false;
-    }
-
-    /**
-     * @return bool
-     */
-    protected function isTrackingModifiedAttributes(): bool
-    {
-        return !$this->isInitializing() && !$this->isResolving();
-    }
-
-    /**
-     * @return ObjectCollection
-     */
-    public function newCollection()
-    {
-        return ObjectCollection::makeObjectCollection(static::class);
-    }
-
-    public function resolveUnknownAttribute(string $attributeName)
-    {
-        throw new UndefinedAttribute(get_class($this), $attributeName);
-    }
-
-    /**
      * Get items as an array of scalar values
      *
      * @return array
      */
     public function toScalarArray()
     {
-        return $this->getTransformer()->skipNonAttributes()->smashAll($this->toArray());
-    }
-
-    /**
-     * @return \Sayla\Objects\AttributableObject
-     */
-    public function toStoreObject()
-    {
-        return AttributableObject::makeFromArray($this->descriptor()->getPersistentAttributes($this));
+        return simple_value($this->toArray());
     }
 
     /**
@@ -493,7 +357,7 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
      */
     public function toVisibleObject()
     {
-        return AttributableObject::makeFromArray($this->toVisibleArray());
+        return AttributableObject::make($this->toVisibleArray());
     }
 
     /**
@@ -501,7 +365,7 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
      */
     public function toVisibleArray(): array
     {
-        return $this->pluck(...$this->descriptor()->getVisible());
+        return array_only($this->toArray(), $this->descriptor()->getVisible());
     }
 
     /**
@@ -511,16 +375,6 @@ class DataObject extends AttributableObject implements \Serializable, Attributab
      */
     public function toVisibleScalarArray()
     {
-        return $this->getTransformer()->smashAll($this->toVisibleArray());
-    }
-
-    public function trigger(string $name, ...$arguments)
-    {
-        return $this->fireTriggers($name, $arguments);
-    }
-
-    public function clearModifiedAttributeFlags()
-    {
-        $this->modifiedAttributes = [];
+        return simple_value($this->toVisibleArray());
     }
 }

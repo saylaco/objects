@@ -19,7 +19,7 @@ interface AttributeResolver
     /**
      * @return string
      */
-    public function getAttributeName(): string;
+    public function getAttribute(): string;
 
     /**
      * @return string

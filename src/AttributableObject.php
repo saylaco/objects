@@ -2,80 +2,19 @@
 
 namespace Sayla\Objects;
 
-use Illuminate\Contracts\Support\Arrayable;
-use Illuminate\Contracts\Support\Jsonable;
-use JsonSerializable;
-use Sayla\Helper\Data\StandardObject;
 use Sayla\Objects\Contract\Attributable;
-use Sayla\Util\JsonHelper;
 
-class AttributableObject extends StandardObject implements Attributable
+class AttributableObject implements Attributable
 {
     private $attributes = [];
 
     /**
-     * @param iterable $data
-     * @return array
+     * AttributableObject constructor.
+     * @param array $attributes
      */
-    public static function serializeData(iterable $data): array
+    public function __construct(array $attributes = [])
     {
-        return array_map(function ($value) {
-            if ($value instanceof JsonSerializable) {
-                return $value->jsonSerialize();
-            } elseif ($value instanceof Jsonable) {
-                return JsonHelper::decode($value->toJson(), true);
-            } elseif ($value instanceof Arrayable) {
-                return $value->toArray();
-            } else {
-                return $value;
-            }
-        }, $data);
-    }
-
-    public function __get($name)
-    {
-        return $this->offsetGet($name);
-    }
-
-    public function __set($name, $value)
-    {
-        return $this->offsetSet($name, $value);
-    }
-
-    public function __isset($name)
-    {
-        return $this->offsetExists($name);
-    }
-
-    public function offsetExists($offset)
-    {
-        return $this->isRetrievableAttribute($offset);
-    }
-
-    public function offsetGet($offset)
-    {
-        return $this->getAttributeValue($offset);
-    }
-
-    public function offsetSet($offset, $value)
-    {
-        $this->setAttributeValue($offset, $value);
-    }
-
-    public function offsetUnset($offset)
-    {
-        $this->removeAttribute($offset);
-    }
-
-    protected function isRetrievableAttribute(string $attributeName)
-    {
-        return isset($this->attributes[$attributeName])
-            || (static::class != self::class && method_exists($this, 'get' . ucfirst($attributeName) . 'Attribute'));
-    }
-
-    public function __unset($name)
-    {
-        $this->offsetUnset($name);
+        $this->fill($attributes);
     }
 
     /**
@@ -119,6 +58,26 @@ class AttributableObject extends StandardObject implements Attributable
         return self::serializeData($this->attributes);
     }
 
+    public function offsetExists($offset)
+    {
+        return $this->isRetrievableAttribute($offset);
+    }
+
+    public function offsetGet($offset)
+    {
+        return $this->getAttributeValue($offset);
+    }
+
+    public function offsetSet($offset, $value)
+    {
+        $this->setAttributeValue($offset, $value);
+    }
+
+    public function offsetUnset($offset)
+    {
+        $this->removeAttribute($offset);
+    }
+
     public function pluck(...$attributeNames)
     {
         if (func_num_args() == 1 && is_array($attributeNames[0])) {
@@ -136,18 +95,46 @@ class AttributableObject extends StandardObject implements Attributable
     }
 
     /**
+     * Get the collection of items as JSON.
+     *
+     * @param  int $options
+     * @return string
+     */
+    public function toJson($options = 0)
+    {
+        return json_encode($this->jsonSerialize(), $options);
+    }
+
+    /**
      * @param string $attributeName
      * @param $value
      */
     protected function setAttributeValue(string $attributeName, $value): void
     {
-        if (self::class != static::class &&
-            method_exists($this, $method = 'set' . studly_case($attributeName) . 'Attribute')
-        ) {
-            $this->$method($value);
+        if (self::class != static::class
+            && $this->hasAttributeSetter($attributeName)) {
+            $this->{$this->getAttributeSetter($attributeName)}($value);
         } else {
             $this->setRawAttribute($attributeName, $value);
         }
+    }
+
+    /**
+     * @param string $attributeName
+     * @return string
+     */
+    public function hasAttributeSetter(string $attributeName): bool
+    {
+        return method_exists($this, $this->getAttributeSetter($attributeName));
+    }
+
+    /**
+     * @param string $attributeName
+     * @return string
+     */
+    public function getAttributeSetter(string $attributeName): string
+    {
+        return $setterMethod = 'set' . ucfirst($attributeName) . 'Attribute';
     }
 
     protected function setRawAttribute(string $attributeName, $value)
@@ -155,14 +142,52 @@ class AttributableObject extends StandardObject implements Attributable
         $this->attributes[$attributeName] = $value;
     }
 
+    /**
+     * @param iterable $data
+     * @return array
+     */
+    public static function serializeData(iterable $data): array
+    {
+        $serialized = [];
+        foreach ($data as $k => $v)
+            $serialized[$k] = simple_value($v);
+        return $serialized;
+    }
+
+    public function __get($name)
+    {
+        return $this->offsetGet($name);
+    }
+
+    public function __set($name, $value)
+    {
+        return $this->offsetSet($name, $value);
+    }
+
+    public function __isset($name)
+    {
+        return $this->offsetExists($name);
+    }
+
+    public function __unset($name)
+    {
+        $this->offsetUnset($name);
+    }
+
+    /**
+     * @param string $attributeName
+     * @return string
+     */
+    public function getAttributeGetter(string $attributeName): string
+    {
+        return $getterMethod = 'get' . ucfirst($attributeName) . 'Attribute';
+    }
+
     protected function getAttributeValue(string $attributeName)
     {
         $value = $this->getRawAttribute($attributeName);
-        if (self::class != static::class) {
-            $getterMethod = 'get' . ucfirst($attributeName) . 'Attribute';
-            if (method_exists($this, $getterMethod)) {
-                return $this->$getterMethod($value);
-            }
+        if ($this->hasAttributeGetter($attributeName)) {
+            return $this->{$this->getAttributeGetter($attributeName)}($value);
         }
         return $value;
     }
@@ -174,6 +199,15 @@ class AttributableObject extends StandardObject implements Attributable
     protected function getRawAttribute(string $attributeName)
     {
         return $this->attributes[$attributeName] ?? null;
+    }
+
+    /**
+     * @param string $attributeName
+     * @return string
+     */
+    public function hasAttributeGetter(string $attributeName): bool
+    {
+        return method_exists($this, $this->getAttributeGetter($attributeName));
     }
 
     /**
@@ -194,6 +228,12 @@ class AttributableObject extends StandardObject implements Attributable
         return isset($this->attributes[$attributeName]);
     }
 
+    protected function isRetrievableAttribute(string $attributeName)
+    {
+        return isset($this->attributes[$attributeName])
+            || (static::class != self::class && $this->hasAttributeGetter($attributeName));
+    }
+
     /**
      * @param iterable $attributeNames
      * @return \Sayla\Objects\AttributableObject
@@ -203,14 +243,7 @@ class AttributableObject extends StandardObject implements Attributable
         $atts = [];
         foreach ($attributeNames as $attributeName)
             $atts[$attributeName] = $this[$attributeName];
-        return self::makeFromArray($atts);
-    }
-
-    public static function makeFromArray($attributes): self
-    {
-        $attributableObject = new self;
-        $attributableObject->attributes = (array)$attributes;
-        return $attributableObject;
+        return self::make($atts);
     }
 
     /**
@@ -229,17 +262,6 @@ class AttributableObject extends StandardObject implements Attributable
     protected function setAttributes(array $attributes)
     {
         $this->attributes = $attributes;
-    }
-
-    /**
-     * Get the collection of items as JSON.
-     *
-     * @param  int $options
-     * @return string
-     */
-    public function toJson($options = 0)
-    {
-        return json_encode($this->jsonSerialize(), $options);
     }
 
     public function unserialize($serialized)

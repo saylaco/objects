@@ -4,13 +4,16 @@ namespace Sayla\Objects;
 
 use Illuminate\Support\Collection;
 use Sayla\Exception\InvalidValue;
+use Sayla\Objects\Contract\NonCachableAttribute;
+use Sayla\Objects\DataType\DataTypeDescriptor;
+use Sayla\Objects\DataType\DataTypeManager;
 
 /**
  * @method DataObject[] getIterator
  */
 class ObjectCollection extends Collection
 {
-    protected $itemDescriptor = DataObject::class;
+    protected $dataType = DataObject::class;
     protected $allowNullItems = false;
     protected $requireItemKey = false;
     protected $keyAttribute;
@@ -25,7 +28,7 @@ class ObjectCollection extends Collection
                                                 bool $requireItemKey = false, string $itemKey = null)
     {
         $collection = new static();
-        $collection->itemDescriptor = $descriptor;
+        $collection->dataType = $descriptor;
         $collection->allowNullItems = $allowNullItems;
         $collection->requireItemKey = $requireItemKey;
         $collection->keyAttribute = $itemKey;
@@ -50,37 +53,33 @@ class ObjectCollection extends Collection
      */
     public function getItemClass(): string
     {
-        return $this->itemDescriptor;
+        return $this->dataType;
+    }
+
+    public function groupBy($groupBy, $preserveKeys = false)
+    {
+        $results = $this->toBase()->groupBy($groupBy, $preserveKeys);
+        foreach ($results as $i => $tempCollection) {
+            if ($tempCollection->first() instanceof DataObject) {
+                $collection = clone $this;
+                $collection->items = $tempCollection->all();
+                $results[$i] = $collection;
+            }
+        }
+        return $results;
+    }
+
+    public function jsonSerialize(bool $valuesOnly = false)
+    {
+        if ($valuesOnly || !$this->isForcingKeys()) {
+            return array_values(parent::jsonSerialize());
+        }
+        return parent::jsonSerialize();
     }
 
     public function keys()
     {
         return parent::keys()->toBase();
-    }
-
-    /**
-     * @param $items
-     * @return $this
-     */
-    public function makeObjects($items)
-    {
-        foreach ($items as $i => $item) {
-            if (!$item instanceof $this->itemDescriptor) {
-                $this->push($this->makeObject($item));
-            } else {
-                $this->push($item);
-            }
-        }
-        return $this;
-    }
-
-    /**
-     * @param $item
-     * @return Object
-     */
-    protected function makeObject($item)
-    {
-        return DataObject::makeObject($this->itemDescriptor, (array)$item);
     }
 
     /**
@@ -118,19 +117,40 @@ class ObjectCollection extends Collection
         }
     }
 
+    public function pluck($value, $key = null)
+    {
+        return parent::pluck($value, $key)->toBase();
+    }
+
     protected function validateItemType($value)
     {
         if ($this->allowNullItems && $value === null) {
             return;
         }
         $itemDescriptor = $this->getItemDescriptor();
-        if (!is_a($value, $itemDescriptor->class)
-            && !is_subclass_of($value, $itemDescriptor->class)
-            && ($value->descriptor()->name != $itemDescriptor->name)
-            && ($value->descriptor()->class != $itemDescriptor->class)
+        if (!is_a($value, $itemDescriptor->getObjectClass())
+            && !is_subclass_of($value, $itemDescriptor->getObjectClass())
+            && ($value->getDataType() != $itemDescriptor->getDataType())
+            && (get_class($value) != $itemDescriptor->getObjectClass())
         ) {
-            throw new InvalidValue("An item must a '{$this->itemDescriptor}' object");
+            throw new InvalidValue("An item must a '{$this->dataType}' object");
         }
+    }
+
+    /**
+     * @return \Sayla\Objects\DataType\DataTypeDescriptor
+     */
+    protected function getItemDescriptor(): DataTypeDescriptor
+    {
+        return DataTypeManager::getInstance()->getDescriptor($this->dataType);
+    }
+
+    /**
+     * @return bool
+     */
+    protected function isForcingKeys(): bool
+    {
+        return $this->keyAttribute != null;
     }
 
     protected function validateItemKey($key)
@@ -140,9 +160,30 @@ class ObjectCollection extends Collection
         }
     }
 
-    public function pluck($value, $key = null)
+    /**
+     * @param $items
+     * @return $this
+     */
+    public function makeObjects($items)
     {
-        return parent::pluck($value, $key)->toBase();
+        foreach ($items as $i => $item) {
+            if (!$item instanceof $this->dataType) {
+                $this->push($this->makeObject($item));
+            } else {
+                $this->push($item);
+            }
+        }
+        return $this;
+    }
+
+    /**
+     * @param $item
+     * @return \Sayla\Objects\DataObject
+     * @throws \Sayla\Objects\Exception\HydrationError
+     */
+    protected function makeObject($item)
+    {
+        return DataTypeManager::getInstance()->get($this->dataType)->hydrate($item);
     }
 
     /**
@@ -154,58 +195,25 @@ class ObjectCollection extends Collection
         $itemDescriptor = $this->getItemDescriptor();
         $allAttributes = [];
         foreach ($attributes as $attribute) {
-            $values = $itemDescriptor->resolveValues($attribute, $this);
+            $resolver = $itemDescriptor->getResolver($attribute);
+            if ($resolver instanceof NonCachableAttribute) {
+                continue;
+            }
+            $values = $resolver->resolveMany($this);
             foreach ($values as $i => $value) {
                 $allAttributes[$i][$attribute] = $value;
             }
         }
         if (!empty($allAttributes)) {
             foreach ($this as $i => $object) {
-                $object->initializeAttributeValues($allAttributes[$i]);
+                $object->init($allAttributes[$i]);
             }
         }
         return $this;
     }
 
-    /**
-     * @return \Sayla\Objects\Inspection\ObjectDescriptor
-     */
-    protected function getItemDescriptor(): Inspection\ObjectDescriptor
-    {
-        return DataObject::getDescriptor($this->itemDescriptor);
-    }
-
     public function toPrettyJson()
     {
         return json_encode($this->jsonSerialize(), JSON_PRETTY_PRINT);
-    }
-
-    public function jsonSerialize(bool $valuesOnly = false)
-    {
-        if ($valuesOnly || !$this->isForcingKeys()) {
-            return array_values(parent::jsonSerialize());
-        }
-        return parent::jsonSerialize();
-    }
-
-    /**
-     * @return bool
-     */
-    protected function isForcingKeys(): bool
-    {
-        return $this->keyAttribute != null;
-    }
-
-    /**
-     * @return Collection|array[]
-     */
-    public function toScalars()
-    {
-        return $this->map->toScalarArray()->toBase();
-    }
-
-    public function groupBy($groupBy, $preserveKeys = false)
-    {
-        return parent::groupBy($groupBy, $preserveKeys)->toBase();
     }
 }

@@ -1,8 +1,11 @@
 <?php
 
-use Sayla\Objects\AttributeResolverFactory;
+use Illuminate\Contracts\Support\Arrayable;
+use Illuminate\Contracts\Support\Jsonable;
+use Sayla\Objects\AttributeResolverManager;
 use Sayla\Objects\Stubs\StubFactory;
-use Sayla\Objects\Transformers\Transformer;
+use Sayla\Objects\Transformers\ValueTransformerFactory;
+use Sayla\Util\JsonHelper;
 
 if (!function_exists('stub')) {
     /**
@@ -25,9 +28,9 @@ if (!function_exists('stub')) {
     }
 }
 if (!function_exists('attribute_resolver')) {
-    function attribute_resolver(): AttributeResolverFactory
+    function attribute_resolver()
     {
-        return new AttributeResolverFactory();
+        throw new BadFunctionCallException('deprecated');
     }
 }
 if (!function_exists('build_value')) {
@@ -39,7 +42,7 @@ if (!function_exists('build_value')) {
      */
     function build_value(string $transformer, $value, $options = null)
     {
-        return Transformer::getFactory()
+        return ValueTransformerFactory::getInstance()
             ->getTransformer($transformer, $options)
             ->build($value);
     }
@@ -54,8 +57,27 @@ if (!function_exists('smash_value')) {
      */
     function smash_value(string $transformer, $value, $options = null)
     {
-        return Transformer::getFactory()
+        return ValueTransformerFactory::getInstance()
             ->getTransformer($transformer, $options)
             ->smash($value);
+    }
+}
+if (!function_exists('simple_value')) {
+    /**
+     * @param $value
+     * @return array|mixed
+     */
+    function simple_value($value)
+    {
+        if ($value instanceof JsonSerializable) {
+            return $value->jsonSerialize();
+        } elseif ($value instanceof Jsonable) {
+            return JsonHelper::decode($value->toJson(), true);
+        } elseif ($value instanceof Arrayable) {
+            return $value->toArray();
+        } elseif (!is_scalar($value)) {
+            return JsonHelper::encodeDecodeToArray($value);
+        }
+        return $value;
     }
 }

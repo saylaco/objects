@@ -2,10 +2,8 @@
 
 namespace Sayla\Objects;
 
-use Sayla\Objects\Providers\LaravelObjectsBindings;
-use Sayla\Support\Bindings\Laravel\LaravelRegistrar;
+use Sayla\Objects\Support\Illuminate\LaravelObjectsBindings;
 use Sayla\Support\Bindings\Laravel\LaravelServiceProvider;
-use Sayla\Support\Bindings\Registrar;
 
 
 class ObjectServiceProvider extends LaravelServiceProvider

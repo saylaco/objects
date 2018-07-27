@@ -35,7 +35,7 @@ class ObjectCollectionTransformer implements ValueTransformer
      * @param mixed $value
      * @return string|null
      */
-    public function smash($value): ?string
+    public function smash($value)
     {
         if ($value instanceof ObjectCollection) {
             return $value->toJson();
@@ -46,20 +46,23 @@ class ObjectCollectionTransformer implements ValueTransformer
     /**
      * @return mixed|object|\Sayla\Objects\ObjectCollection|static
      */
-    protected function newCollectionInstance()
+    protected function newCollectionInstance(): ObjectCollection
     {
         if ($this->options->resolver != null) {
-            $collection = call_user_func($this->options->resolver);
+            return call_user_func($this->options->resolver);
         } elseif ($this->options->class != null) {
-            $collection = (new \ReflectionClass($this->options->class))->newInstance();
+            return (new \ReflectionClass($this->options->class))->newInstance();
         } else {
-            $descriptor = $this->options->descriptor ?? $this->options->itemClass ?? DataObject::class;
-            $collection = ObjectCollection::makeObjectCollection(
-                $descriptor,
+            $dataType = $this->options->dataType ?? $this->options->itemClass;
+            if (is_subclass_of($dataType, DataObject::class)) {
+                return $dataType::newObjectCollection();
+            }
+            return ObjectCollection::makeObjectCollection(
+                $dataType,
                 $this->options->get('nullableItems', false),
                 $this->options->get('requireKeys', false)
             );
         }
-        return $collection;
+        return ObjectCollection::make();
     }
 }

@@ -69,27 +69,20 @@ class DatetimeTransformer implements ValueTransformer
      */
     public function smash($value)
     {
-        $format = $this->options->get('format', 'Y-m-d H:i:s');
-        if (empty($value) && !$this->options->auto) {
-            return null;
-        } elseif (empty($value)) {
-            return Carbon::now()->format($format);
-        }
-        if ($value instanceof \DateTime) {
+        $format = $this->getSmashFormat();
+        if (empty($value)) {
+            $datetime = Carbon::now();
+        } elseif ($value instanceof \DateTime) {
             $datetime = $value;
+        } elseif (is_string($value) && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value)) {
+            $datetime = $this->newDateObject($value, 'Y-m-d');
         } elseif (is_string($value)) {
             $datetime = Carbon::parse($value, $this->normalizeTimezone());
         } elseif (is_numeric($value)) {
             $datetime = $this->newDateFromTimestamp($value);
-        } elseif (is_string($value) && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value)) {
-            $datetime = $this->newDateObject($value, 'Y-m-d');
         }
-        if (isset($datetime) && $datetime instanceof \DateTime) {
-            $smashFormat = $this->options->get('smashFormat') ?: $format;
-            if ($smashFormat == 'timestamp') {
-                return $datetime->getTimestamp();
-            }
-            return $datetime->format($smashFormat);
+        if ($datetime instanceof \DateTime) {
+            return $format == 'timestamp' ? $datetime->getTimestamp() : $datetime->format($format);
         }
         return $value;
     }
@@ -109,6 +102,15 @@ class DatetimeTransformer implements ValueTransformer
     }
 
     /**
+     * @param $timezone
+     * @return mixed|null
+     */
+    protected function normalizeTimezone($timezone = null)
+    {
+        return $timezone ?? $this->options->get('timezone') ?? static::$defaultTimezone;
+    }
+
+    /**
      * @param mixed $value
      * @param string $timezone
      * @return \Carbon\Carbon
@@ -116,6 +118,24 @@ class DatetimeTransformer implements ValueTransformer
     protected function newDateFromTimestamp($value, $timezone = null)
     {
         return Carbon::createFromTimestamp($value, $this->normalizeTimezone($timezone));
+    }
+
+    public function getSmashFormat(): string
+    {
+        return $this->options->get('smashFormat', $this->options->get('format', 'Y-m-d H:i:s'));
+    }
+
+    public function getBuildFormat(): string
+    {
+        return $this->options->get('buildFormat', $this->options->get('format', 'Y-m-d H:i:s'));
+    }
+
+    /**
+     * @return mixed|null
+     */
+    public function isNullable()
+    {
+        return $this->options->get('nullable', true);
     }
 
     /**
@@ -127,14 +147,5 @@ class DatetimeTransformer implements ValueTransformer
     protected function newDateFromFormat($value, $format)
     {
         return $this->newDateObject($value, $format);
-    }
-
-    /**
-     * @param $timezone
-     * @return mixed|null
-     */
-    protected function normalizeTimezone($timezone)
-    {
-        return $timezone ?? $this->options->get('timezone') ?? static::$defaultTimezone;
     }
 }

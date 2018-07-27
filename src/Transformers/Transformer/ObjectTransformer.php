@@ -3,18 +3,19 @@
 namespace Sayla\Objects\Transformers\Transformer;
 
 use Sayla\Objects\AttributableObject;
-use Sayla\Objects\BaseDataModel;
-use Sayla\Objects\DataObject;
+use Sayla\Objects\Contract\SupportsDataTypeManager;
 use Sayla\Objects\Transformers\ValueTransformer;
 use Sayla\Objects\Transformers\ValueTransformerTrait;
 
-class ObjectTransformer implements ValueTransformer
+class ObjectTransformer implements ValueTransformer, SupportsDataTypeManager
 {
     use ValueTransformerTrait;
+    use SupportsDataTypeManagerTrait;
 
     /**
      * @param mixed $value
-     * @return string|null
+     * @return mixed|null|\Sayla\Objects\DataObject
+     * @throws \Sayla\Objects\Exception\HydrationError
      */
     public function build($value)
     {
@@ -28,11 +29,8 @@ class ObjectTransformer implements ValueTransformer
             return null;
         }
         $attributes = $value ?? [];
-        $descriptor = $this->options->descriptor ?? $this->options->class;
-        if ($this->options->hydrate) {
-            return BaseDataModel::hydrateObject($descriptor, $attributes);
-        }
-        return DataObject::makeObject($descriptor, $attributes);
+        $dataType = $this->options->dataType ?? $this->options->class;
+        return self::getDataTypeManager()->get($dataType)->hydrate($attributes);
     }
 
     public function getScalarType(): ?string

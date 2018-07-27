@@ -4,7 +4,7 @@ namespace Sayla\Objects\Stubs;
 
 use ArrayAccess;
 use Faker\Generator as Faker;
-use Sayla\Objects\Inspection\ObjectDescriptors;
+use Sayla\Objects\DataType\DataTypeManager;
 use Symfony\Component\Finder\Finder;
 
 class StubFactory implements ArrayAccess
@@ -31,19 +31,23 @@ class StubFactory implements ArrayAccess
      * @var \Faker\Generator
      */
     protected $faker;
+    /**
+     * @var \Sayla\Objects\DataType\DataTypeManager
+     */
+    private $dataTypeManager;
 
     /**
      * Create a new factory instance.
      *
      * @param  \Faker\Generator $faker
      */
-    public function __construct(Faker $faker, ObjectDescriptors $descriptors)
+    public function __construct(Faker $faker, DataTypeManager $dataTypeManager)
     {
         $this->faker = $faker;
-        $this->descriptors = $descriptors;
         if (!self::hasInstance()) {
             self::setInstance($this);
         }
+        $this->dataTypeManager = $dataTypeManager;
     }
 
     /**
@@ -91,7 +95,7 @@ class StubFactory implements ArrayAccess
      */
     public function of($class, $name = 'default')
     {
-        return new StubBuilder($class, $name, $this->definitions, $this->states, $this->faker, $this->descriptors);
+        return new StubBuilder($class, $name, $this->definitions, $this->states, $this->faker, $this->dataTypeManager);
     }
 
     /**

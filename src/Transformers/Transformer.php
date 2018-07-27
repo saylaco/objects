@@ -3,12 +3,17 @@
 namespace Sayla\Objects\Transformers;
 
 use Sayla\Exception\Error;
+use Sayla\Objects\Exception\TransformationError;
 
 class Transformer
 {
-    /** @var \Sayla\Objects\Transformers\ValueFactory */
-    private static $factory;
-    /** @var string[] */
+    /**
+     * @var ValueTransformerFactory
+     */
+    private static $factoryInstance;
+    /**
+     * @var string[]
+     */
     private static $aliases = [
         'fk' => 'databaseKey',
         'pk' => 'databaseKey',
@@ -19,35 +24,42 @@ class Transformer
      * @var mixed[][]
      */
     protected $options = [];
+    /**
+     * @var bool
+     */
     protected $skipNonAttributes = false;
+    /**
+     * @var bool
+     */
     protected $skipObjectSmashing = false;
-    protected $contexts = [];
+    /**
+     * @var array
+     */
     private $valueTransformers = [];
+    /**
+     * @var ValueTransformerFactory
+     */
+    private $valueFactory;
 
     /**
-     * Transformer constructor.
      * @param iterable $allOptions
      */
     public function __construct(iterable $allOptions = [])
     {
         $this->options = [];
         foreach ($allOptions as $name => $options) {
-            $this->addAttribute($name, $options);
+            $options = simple_value($options);
+            $type = array_pull($options, 'type');
+            $this->addAttribute($name, $type, $options);
         }
     }
 
     /**
      * @param string $name
      * @param array $optionsArray
-     * @throws \ErrorException
      */
-    public function addAttribute(string $name, array $optionsArray): void
+    public function addAttribute(string $name, string $type, array $optionsArray): void
     {
-        if (!isset($optionsArray['type'])) {
-            throw new \ErrorException('Transformation type property must be set: '
-                . $name . ' = ' . varExport($optionsArray));
-        }
-        $type = $optionsArray['type'];
         $options = new Options($optionsArray);
         if (isset(self::$aliases[$type])) {
             $options['type'] = self::$aliases[$type];
@@ -63,76 +75,43 @@ class Transformer
     }
 
     /**
-     * @param string $valueTransformerClass
-     * @param string|null $typeName
-     * @throws \Sayla\Exception\Error
+     * @param \Sayla\Objects\Transformers\ValueTransformerFactory $resolver
      */
-    public static function addType(string $valueTransformerClass, string $typeName)
+    public static function setValueFactory(ValueTransformerFactory $resolver)
     {
-        self::getFactory()->addType($valueTransformerClass, $typeName);
-    }
-
-    public static function getFactory(): ValueFactory
-    {
-        return self::$factory;
-    }
-
-    public static function setFactory(ValueFactory $resolver)
-    {
-        self::$factory = $resolver;
+        self::$factoryInstance = $resolver;
     }
 
     /**
-     * @param array $attributes
-     * @param array $context
-     * @return array
+     * @param $attributes
+     * @return mixed
+     * @throws \Sayla\Exception\Error
      */
-    public function buildAll($attributes, ...$context)
+    public function buildAll($attributes)
     {
         if (count($this->options) == 0) {
             return $attributes;
         }
-        $this->pushContext($context);
         foreach ($attributes as $k => $v)
             $attributes[$k] = $this->build($k, $v);
-        $this->popContext();
         return $attributes;
     }
 
     /**
-     * @param $context
-     * @return mixed
-     */
-    public function pushContext(array $context): void
-    {
-        $this->contexts[] = $context;
-    }
-
-    /**
      * @param string $key
-     * @param $value
-     * @param array $context
-     * @return mixed
+     * @param null $value
+     * @return mixed|null
      * @throws \Sayla\Exception\Error
      */
-    public function build(string $key, $value = null, ...$context)
+    public function build(string $key, $value = null)
     {
-        $hasContext = func_num_args() > 2;
         try {
-            if ($hasContext) {
-                $this->pushContext($context);
-            }
             if ($this->isNotTransformable($key)) {
                 return $value;
             }
             return $this->callBuilder($key, $value);
         } catch (\Throwable $exception) {
-            throw (new Error(trim('Failed transformation of "' . $key . '" ' . $exception->getMessage()), $exception))
-                ->withContext('value', $value);
-        } finally {
-            if ($hasContext) {
-                $this->popContext();
-            }
+            throw new Error("Failed transformation of \${$key}", $exception);
         }
     }
 
@@ -180,51 +159,48 @@ class Transformer
      */
     public function callBuilder(string $key, $value)
     {
-        $context = $this->getContext();
-        array_unshift($context, $value);
-        return call_user_func_array([$this->getValueTransformer($key), 'build'], $context);
+        return call_user_func([$this->getValueTransformer($key), 'build'], $value);
     }
+
 
     /**
-     * @return array
+     * @param $key
+     * @return \Sayla\Objects\Transformers\ValueTransformer
+     * @throws \ErrorException
      */
-    public function getContext(): array
-    {
-        return end($this->contexts) ?: [];
-    }
-
     public function getValueTransformer($key): ValueTransformer
     {
         if (isset($this->valueTransformers[$key])) {
             return $this->valueTransformers[$key];
         }
         $options = $this->getAttributeOptions($key);
-        return $this->valueTransformers[$key] = self::getFactory()->getTransformer($options->type, $options);
+        return $this->valueTransformers[$key] = $this->getFactory()->getTransformer($options->type, $options);
     }
 
-    public function popContext(): void
+    /**
+     * @return ValueTransformerFactory
+     */
+    public function getFactory(): ValueTransformerFactory
     {
-        array_pop($this->contexts);
+        return $this->valueFactory ?? ValueTransformerFactory::getInstance();
     }
 
     /**
      * @param array $attributes
-     * @param array $context
      * @return array
+     * @throws \Sayla\Exception\Error
      */
-    public function buildOnly(array $attributes, ...$context): array
+    public function buildOnly(array $attributes): array
     {
         if (count($this->options) == 0) {
             return $attributes;
         }
         $built = [];
-        $this->pushContext($context);
         foreach ($attributes as $k => $v) {
             if (isset($this->options[$k])) {
                 $built[$k] = $this->build($k, $v);
             }
         }
-        $this->popContext();
         return $built;
     }
 
@@ -235,16 +211,7 @@ class Transformer
     public function getBuildCallable(string $attributeName)
     {
         return function ($value, ...$args) use ($attributeName) {
-            if ($hasContext = count($args) > 0) {
-                $this->pushContext($args);
-            }
-            try {
-                return $this->callBuilder($attributeName, $value);
-            } finally {
-                if ($hasContext) {
-                    $this->popContext();
-                }
-            }
+            return $this->callBuilder($attributeName, $value);
         };
     }
 
@@ -266,9 +233,7 @@ class Transformer
      */
     public function callSmasher(string $key, $value)
     {
-        $context = $this->getContext();
-        array_unshift($context, $value);
-        return call_user_func_array([$this->getValueTransformer($key), 'smash'], $context);
+        return call_user_func([$this->getValueTransformer($key), 'smash'], $value);
     }
 
     /**
@@ -300,6 +265,16 @@ class Transformer
     }
 
     /**
+     * @param ValueTransformerFactory $valueFactory
+     * @return \Sayla\Objects\Transformers\Transformer
+     */
+    public function setFactory(?ValueTransformerFactory $valueFactory): self
+    {
+        $this->valueFactory = $valueFactory;
+        return $this;
+    }
+
+    /**
      * @param bool $skipNonAttributes
      * @return Transformer
      */
@@ -309,6 +284,10 @@ class Transformer
         return $this;
     }
 
+    /**
+     * @param bool $skipObjectSmashing
+     * @return $this
+     */
     public function skipObjectSmashing(bool $skipObjectSmashing = true)
     {
         $this->skipObjectSmashing = $skipObjectSmashing;
@@ -316,73 +295,55 @@ class Transformer
     }
 
     /**
-     * @param array $attributes
-     * @param array $context
-     * @return array
+     * @param $attributes
+     * @return mixed
+     * @throws \Sayla\Objects\Exception\TransformationError
      */
-    public function smashAll($attributes, ...$context)
+    public function smashAll($attributes)
     {
         if (count($this->options) == 0) {
             return $attributes;
         }
-        if (count($context) > 0) {
-            $this->pushContext($context);
-        }
         foreach ($attributes as $k => $v) {
             $attributes[$k] = $this->smash($k, $v);
-        }
-        if (count($context) > 0) {
-            $this->popContext();
         }
         return $attributes;
     }
 
     /**
      * @param string $key
-     * @param mixed $value
-     * @param array $context
+     * @param null $value
      * @return mixed|null
+     * @throws \Sayla\Objects\Exception\TransformationError
      */
-    public function smash(string $key, $value = null, ...$context)
+    public function smash(string $key, $value = null)
     {
-        $hasContext = func_num_args() > 2;
         try {
-            if ($hasContext) {
-                $this->pushContext($context);
-            }
-
             if ($this->isNotTransformable($key)) {
                 return $value;
             }
             return $this->callSmasher($key, $value);
         } catch (\Throwable $e) {
-            throw (new Error(trim('Failed transformation of "' . $key . '". ' . $e->getMessage()), $e))
-                ->withContext('value', $value);
-        } finally {
-            if ($hasContext) {
-                $this->popContext();
-            }
+            throw new TransformationError('Failed transformation of $' . $key, $e);
         }
     }
 
     /**
      * @param array $attributes
-     * @param array $context
      * @return array
+     * @throws \Sayla\Objects\Exception\TransformationError
      */
-    public function smashOnly(array $attributes, ...$context): array
+    public function smashOnly(array $attributes): array
     {
         if (count($this->options) == 0) {
             return $attributes;
         }
         $smashed = [];
-        $this->pushContext($context);
         foreach ($attributes as $k => $v) {
             if (isset($this->options[$k])) {
                 $smashed[$k] = $this->smash($k, $v);
             }
         }
-        $this->popContext();
         return $smashed;
     }
 

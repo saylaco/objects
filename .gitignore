@@ -12,3 +12,4 @@ npm-debug.log
 test.php
 composer.lock
 .env
+.phpunit.result.cache

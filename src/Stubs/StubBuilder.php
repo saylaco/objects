@@ -8,7 +8,7 @@ use InvalidArgumentException;
 use Sayla\Objects\Contract\Keyable;
 use Sayla\Objects\DataModel;
 use Sayla\Objects\DataObject;
-use Sayla\Objects\Inspection\ObjectDescriptors;
+use Sayla\Objects\DataType\DataTypeManager;
 use Sayla\Objects\ObjectCollection;
 
 class StubBuilder
@@ -62,9 +62,9 @@ class StubBuilder
      */
     protected $amount = null;
     /**
-     * @var \Sayla\Objects\Inspection\ObjectDescriptors
+     * @var \Sayla\Objects\DataType\DataTypeManager
      */
-    private $descriptors;
+    private $dataTypeManager;
 
     /**
      * Create an new builder instance.
@@ -74,21 +74,21 @@ class StubBuilder
      * @param  array $definitions
      * @param  array $states
      * @param  \Faker\Generator $faker
-     * @param \Sayla\Objects\Inspection\ObjectDescriptors $descriptors
+     * @param \Sayla\Objects\DataType\DataTypeManager $dataTypeManager
      */
     public function __construct(string $class,
                                 string $name,
                                 array $definitions,
                                 array $states,
                                 Faker $faker,
-                                ObjectDescriptors $descriptors)
+                                DataTypeManager $dataTypeManager)
     {
         $this->name = $name;
         $this->class = $class;
         $this->faker = $faker;
         $this->states = $states;
         $this->definitions = $definitions;
-        $this->descriptors = $descriptors;
+        $this->dataTypeManager = $dataTypeManager;
     }
 
     /**
@@ -158,7 +158,7 @@ class StubBuilder
             throw new InvalidArgumentException("Unable to locate factory with name [{$this->name}] [{$this->class}].");
         }
 
-        return $this->descriptors->makeObject($this->class, $this->getRawAttributes($attributes));
+        return $this->dataTypeManager->get($this->class)->hydrate($this->getRawAttributes($attributes));
     }
 
     /**

@@ -1,8 +1,6 @@
 ```php
 [
-    'section:object' => [
-        'resolver' => self::resolver()->belongsToObject(Section::class, 'sectionId')
-    ]
+    'section:object' =>  new BelongsToObject(Section::class, 'sectionId')
 ]
 
 [
@@ -24,7 +22,7 @@
  * @property UrlGroup $urls
 
 [
-    'urls:alias'
+    'urls:serial'
 ]
 
 public function resolveUrlsAlias()
