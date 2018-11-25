@@ -5,7 +5,6 @@ namespace Sayla\Objects\DataType;
 
 use Sayla\Objects\Attribute\Attribute;
 use Sayla\Objects\Attribute\AttributeFactory;
-use Sayla\Objects\Attribute\Mixin\MixinSet;
 use Sayla\Objects\Attribute\Property\AccessPropertyType;
 use Sayla\Objects\Attribute\Property\DefaultPropertyType;
 use Sayla\Objects\Attribute\Property\MapPropertyType;
@@ -18,6 +17,7 @@ use Sayla\Objects\Exception\HydrationError;
 use Sayla\Objects\ObjectCollection;
 use Sayla\Objects\ObjectDispatcher;
 use Sayla\Objects\Transformers\Transformer;
+use Sayla\Util\Mixin\MixinSet;
 
 abstract class BaseDataType implements \Sayla\Objects\Contract\DataType
 {

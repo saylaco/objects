@@ -5,7 +5,7 @@ namespace Sayla\Objects;
 use DeepCopy\DeepCopy;
 use DeepCopy\TypeFilter\ReplaceFilter;
 use DeepCopy\TypeMatcher\TypeMatcher;
-use Sayla\Helper\Data\StandardObject;
+use Sayla\Helper\Data\SimpleObject;
 use Sayla\Objects\Contract\Attributable;
 
 class Copier
@@ -44,7 +44,7 @@ class Copier
 
     public function copyAttributes(Attributable $object): array
     {
-        $simpleObject = $this->copier->copy(StandardObject::make($object->toArray()));
+        $simpleObject = $this->copier->copy(new SimpleObject($object->toArray()));
         return (array)$simpleObject;
     }
 }

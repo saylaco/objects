@@ -2,7 +2,7 @@
 
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Contracts\Support\Jsonable;
-use Sayla\Data\DotArray;
+use Sayla\Data\DotArrayObject;
 use Sayla\Objects\Transformers\ValueTransformer;
 use Sayla\Objects\Transformers\ValueTransformerTrait;
 use Sayla\Util\JsonHelper;
@@ -13,7 +13,7 @@ class ArrayObjectTransformer implements ValueTransformer
 
     /**
      * @param mixed $value
-     * @return DotArray
+     * @return DotArrayObject
      */
     public function build($value): Arrayable
     {
@@ -53,6 +53,6 @@ class ArrayObjectTransformer implements ValueTransformer
 
     public function getArrayableClass(): string
     {
-        return $this->options->get('class', DotArray::class);
+        return $this->options->get('class', DotArrayObject::class);
     }
 }

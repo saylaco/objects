@@ -2,16 +2,11 @@
 
 namespace Sayla\Objects\Attribute;
 
+use Sayla\Helper\Data\BaseHashMap;
 use Sayla\Objects\Contract\PropertyType;
-use Sayla\Objects\Set;
 
-/**
- * @method getIterator() PropertyType[]
- */
-class PropertyTypeSet extends Set
+class PropertyTypeSet extends BaseHashMap
 {
-    protected $allowUndefinedKeys = true;
-
     public function __construct($properties = null)
     {
         if ($properties) {
@@ -26,6 +21,14 @@ class PropertyTypeSet extends Set
     public function get(string $name): PropertyType
     {
         return $this->items[$name];
+    }
+
+    /**
+     * @return \ArrayIterator|\Traversable|PropertyType[]
+     */
+    public function getIterator()
+    {
+        return new \ArrayIterator($this->items);
     }
 
     public function push(PropertyType $property)

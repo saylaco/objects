@@ -2,13 +2,13 @@
 
 namespace Sayla\Objects\DataType;
 
-use Sayla\Objects\Attribute\Mixin\MixinSet;
 use Sayla\Objects\Exception\AttributeResolverNotFound;
 use Sayla\Objects\ObjectCollection;
+use Sayla\Util\Mixin\MixinSet;
 
 class DataTypeDescriptor
 {
-    /** @var \Sayla\Objects\Attribute\Mixin\MixinSet[] */
+    /** @var \Sayla\Util\Mixin\MixinSet[] */
     private static $mixins = [];
     protected $resolvable = [];
     /** @var \Sayla\Objects\ObjectDispatcher */
@@ -66,9 +66,9 @@ class DataTypeDescriptor
     }
 
     /**
-     * @param \Sayla\Objects\Attribute\Mixin\MixinSet $mixins
+     * @param \Sayla\Util\Mixin\MixinSet $mixins
      */
-    public function setMixins(\Sayla\Objects\Attribute\Mixin\MixinSet $mixins): void
+    public function setMixins(\Sayla\Util\Mixin\MixinSet $mixins): void
     {
         self::$mixins[$this->getDataType()] = $mixins;
     }

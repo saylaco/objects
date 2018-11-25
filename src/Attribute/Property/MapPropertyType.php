@@ -3,9 +3,9 @@
 namespace Sayla\Objects\Attribute\Property;
 
 use Sayla\Objects\Contract\DataType;
-use Sayla\Objects\Contract\Mixin;
 use Sayla\Objects\Contract\PropertyType;
 use Sayla\Objects\Contract\ProvidesDataTypeDescriptorMixin;
+use Sayla\Util\Mixin\Mixin;
 
 class MapPropertyType implements PropertyType, ProvidesDataTypeDescriptorMixin
 {

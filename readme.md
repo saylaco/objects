@@ -5,7 +5,7 @@
 
 [
     'block_data:json' => ['default' => function () {
-        return new DotArray();
+        return new DotArrayObject();
     }],
 ]
 

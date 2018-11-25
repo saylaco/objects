@@ -2,10 +2,10 @@
 
 namespace Sayla\Objects\Attribute;
 
-use Sayla\Objects\Attribute\Property\PropertyArray;
+use Sayla\Objects\Attribute\Property\PropertySet;
 use Sayla\Objects\Contract\Property;
 
-class Attribute extends PropertyArray
+class Attribute extends PropertySet
 {
 
     /**

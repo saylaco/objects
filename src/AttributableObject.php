@@ -48,16 +48,6 @@ class AttributableObject implements Attributable
         return array_key_exists($attributeName, $this->attributes);
     }
 
-    /**
-     * Convert the object into something JSON serializable.
-     *
-     * @return array
-     */
-    public function jsonSerialize()
-    {
-        return self::serializeData($this->attributes);
-    }
-
     public function offsetExists($offset)
     {
         return $this->isRetrievableAttribute($offset);
@@ -140,6 +130,16 @@ class AttributableObject implements Attributable
     protected function setRawAttribute(string $attributeName, $value)
     {
         $this->attributes[$attributeName] = $value;
+    }
+
+    /**
+     * Convert the object into something JSON serializable.
+     *
+     * @return array
+     */
+    public function jsonSerialize()
+    {
+        return self::serializeData($this->attributes);
     }
 
     /**

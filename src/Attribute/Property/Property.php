@@ -57,13 +57,13 @@ class Property extends FreezableObject implements PropertyInterface
         return $this->value;
     }
 
-    public function jsonSerialize()
-    {
-        return json_encode($this->value);
-    }
-
     public function toJson($options = 0)
     {
         return json_encode($this->value, $options);
+    }
+
+    public function jsonSerialize()
+    {
+        return json_encode($this->value);
     }
 }

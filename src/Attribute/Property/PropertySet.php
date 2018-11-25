@@ -6,7 +6,7 @@ use Sayla\Helper\Data\Contract\FreezableTrait;
 use Sayla\Objects\AttributableObject;
 use Sayla\Objects\Contract\Property as PropertyInterface;
 
-class PropertyArray extends AttributableObject implements PropertyInterface, \Countable
+class PropertySet extends AttributableObject implements PropertyInterface, \Countable
 {
     use FreezableTrait;
     /** @var string */

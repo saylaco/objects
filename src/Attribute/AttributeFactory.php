@@ -4,7 +4,7 @@ namespace Sayla\Objects\Attribute;
 
 use Sayla\Exception\Error;
 use Sayla\Objects\Attribute\Property\Property;
-use Sayla\Objects\Attribute\Property\PropertyArray;
+use Sayla\Objects\Attribute\Property\PropertySet;
 use Sayla\Objects\Attribute\Property\ResolverPropertyType;
 use Sayla\Objects\Contract\AttributeResolver;
 use Sayla\Objects\Contract\Property as PropertyInterface;
@@ -148,7 +148,7 @@ class AttributeFactory
         }
         if (!$value instanceof PropertyInterface) {
             if (is_array($value)) {
-                return new PropertyArray($type::getHandle(), $type->getName(), $value);
+                return new PropertySet($type::getHandle(), $type->getName(), $value);
             } else {
                 return new Property($type::getHandle(), $type->getName(), $value);
             }
