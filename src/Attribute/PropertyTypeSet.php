@@ -2,6 +2,7 @@
 
 namespace Sayla\Objects\Attribute;
 
+use Sayla\Helper\Data\Contract\ProvidesArrayAccessTrait;
 use Sayla\Objects\Contract\PropertyType;
 use Sayla\Objects\Set;
 
@@ -10,6 +11,7 @@ use Sayla\Objects\Set;
  */
 class PropertyTypeSet extends Set
 {
+    use ProvidesArrayAccessTrait;
     protected $allowUndefinedKeys = true;
 
     public function __construct($properties = null)

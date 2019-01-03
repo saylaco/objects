@@ -2,6 +2,7 @@
 
 namespace Sayla\Objects\Attribute\Mixin;
 
+use Sayla\Helper\Data\Contract\ProvidesArrayAccessTrait;
 use Sayla\Objects\Contract\Mixin;
 use Sayla\Objects\Set;
 
@@ -10,6 +11,7 @@ use Sayla\Objects\Set;
  */
 class MixinSet extends Set
 {
+    use ProvidesArrayAccessTrait;
     private $callableMethods = [];
 
     public function call(string $methodName, array $arguments)
