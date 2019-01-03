@@ -4,6 +4,7 @@ namespace Sayla\Objects\Transformers\Transformer;
 
 use Sayla\Objects\AttributableObject;
 use Sayla\Objects\Contract\SupportsDataTypeManager;
+use Sayla\Objects\Contract\SupportsDataTypeManagerTrait;
 use Sayla\Objects\Transformers\ValueTransformer;
 use Sayla\Objects\Transformers\ValueTransformerTrait;
 
