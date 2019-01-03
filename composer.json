@@ -8,9 +8,9 @@
   "require": {
     "myclabs/deep-copy": "^1.6",
     "symfony/options-resolver": ">=3.3",
-    "sayla/utils": "2.*",
-    "sayla/bindings": "2.*",
-    "sayla/data-helper": "2.*"
+    "sayla/utils": "^2.0",
+    "sayla/bindings": "^2.0",
+    "sayla/data-helper": "^2.0.2"
   },
   "require-dev": {
     "phpunit/phpunit": "^7"
