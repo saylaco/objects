@@ -6,20 +6,24 @@ namespace Sayla\Objects\DataType;
 use Illuminate\Contracts\Support\Arrayable;
 use Sayla\Objects\Builder\Builder;
 use Sayla\Objects\Contract\DataType;
-use Sayla\Objects\Contract\ObjectStore;
 use Sayla\Objects\DataObject;
 
 class DataTypeManager implements \IteratorAggregate, Arrayable
 {
-    private static $instance;
     private static $builders = [];
+    private static $instance;
+    private $aliases = [];
     /** @var \Sayla\Objects\Contract\DataType[] */
     private $dataTypes = [];
-    private $aliases = [];
 
     public static function addBuilderExtension(string $builderName, callable $callback)
     {
         self::$builders[$builderName] = $callback;
+    }
+
+    private static function getBuilderExtension(string $builderName): callable
+    {
+        return self::$builders[$builderName];
     }
 
     public static function getInstance(): self
@@ -40,15 +44,10 @@ class DataTypeManager implements \IteratorAggregate, Arrayable
         $builderName = lcfirst(str_after($builderName, 'add'));
         $builderExtension = self::getBuilderExtension($builderName);
         $builder = call_user_func_array($builderExtension, $builderArgs);
-        $builder->onBuild(function (DataType $dataType) {
+        $builder->onPostBuild(function (DataType $dataType) {
             $this->add($dataType);
         });
         return $builder;
-    }
-
-    private static function getBuilderExtension(string $builderName): callable
-    {
-        return self::$builders[$builderName];
     }
 
     public function add(DataType $dataType)
@@ -63,11 +62,6 @@ class DataTypeManager implements \IteratorAggregate, Arrayable
         return $this;
     }
 
-    public function getDescriptor(string $name): DataTypeDescriptor
-    {
-        return clone $this->get($name)->getDescriptor();
-    }
-
     public function get(string $name): DataType
     {
         if (!$this->has($name) && is_subclass_of($name, DataObject::class)) {
@@ -78,19 +72,19 @@ class DataTypeManager implements \IteratorAggregate, Arrayable
         return $this->dataTypes[$name];
     }
 
-    public function has(string $name): bool
-    {
-        return isset($this->dataTypes[$name]) || isset($this->aliases[$name]);
-    }
-
     public function getBuilder(string $objectClass): Builder
     {
         $builder = new Builder($objectClass);
-        $builder->onBuild(function (DataType $dataType) {
+        $builder->onPostBuild(function (DataType $dataType) {
             $this->add($dataType);
         });
         return $builder;
 
+    }
+
+    public function getDescriptor(string $name): DataTypeDescriptor
+    {
+        return clone $this->get($name)->getDescriptor();
     }
 
     /**
@@ -101,25 +95,9 @@ class DataTypeManager implements \IteratorAggregate, Arrayable
         return new \ArrayIterator($this->dataTypes);
     }
 
-    /**
-     * @param string $objectClass
-     * @param \Sayla\Objects\Contract\ObjectStore $storeStrategy
-     * @return \Sayla\Objects\Builder\Builder
-     */
-    public function getStorableBuilder(string $objectClass,
-                                       ObjectStore $storeStrategy = null): Builder
+    public function has(string $name): bool
     {
-        $builder = new Builder($objectClass);
-        $builder
-            ->setDataTypeClass(StoringDataType::class)
-            ->onBuild(function (DataType $dataType) {
-                $this->add($dataType);
-            });
-        if ($storeStrategy) {
-            $builder->storeStrategy($storeStrategy);
-        }
-        return $builder;
-
+        return isset($this->dataTypes[$name]) || isset($this->aliases[$name]);
     }
 
     /**

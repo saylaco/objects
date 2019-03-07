@@ -13,6 +13,7 @@ use Sayla\Objects\Contract\Storable;
  * @property callable|int __beforeUpdate
  * @property callable|int __beforeDelete
  * @property callable|int __beforeSave
+ * @method \Sayla\Objects\Contract\PersistentDataType|\Sayla\Objects\DataType\StoringDataType datatype()
  */
 abstract class DataModel extends DataObject implements Storable
 {

@@ -6,6 +6,8 @@ use Sayla\Objects\Contract\DataType;
 use Sayla\Objects\Contract\ObjectStore;
 use Sayla\Objects\Contract\PersistentDataType;
 use Sayla\Objects\Contract\PersistentDataTypeTrait;
+use Sayla\Objects\Stores\StoreManager;
+use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class StoringDataType extends BaseDataType implements PersistentDataType
@@ -22,8 +24,16 @@ class StoringDataType extends BaseDataType implements PersistentDataType
     public static function configureOptions(OptionsResolver $resolver)
     {
         StandardDataType::configureOptions($resolver);
-        $resolver->setRequired('storeStrategy');
+        $resolver->setDefined('storeName');
+        $resolver->setAllowedTypes('storeName', 'string');
+        $resolver->setDefined('storeStrategy');
         $resolver->setAllowedTypes('storeStrategy', ObjectStore::class);
+        $resolver->setDefault('storeStrategy', function (Options $options, $value) {
+            if (isset($options['storeName'])) {
+                return StoreManager::getInstance()->get($options['storeName']);
+            }
+            return $value;
+        });
     }
 
     /**

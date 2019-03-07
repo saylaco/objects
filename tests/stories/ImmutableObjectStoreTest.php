@@ -76,7 +76,7 @@ class ImmutableObjectStoreTest extends BaseStory
     private function getDataType($storeStrategy): \Sayla\Objects\DataType\StoringDataType
     {
         $dataTypeManager = new DataTypeManager();
-        $builder = $dataTypeManager->getStorableBuilder(ImmutableBookModel::class, $storeStrategy);
+        $builder = $dataTypeManager->getBuilder(ImmutableBookModel::class)->storeStrategy($storeStrategy);
         return $builder
             ->attributeDefinitions([
                 'id:pk' => ['mapTo' => '_id'],

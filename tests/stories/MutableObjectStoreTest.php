@@ -73,7 +73,7 @@ class MutableObjectStoreTest extends BaseStory
     private function getDataType($storeStrategy): \Sayla\Objects\DataType\StoringDataType
     {
         $dataTypeManager = new DataTypeManager();
-        $builder = $dataTypeManager->getStorableBuilder(MutableBookModel::class, $storeStrategy);
+        $builder = $dataTypeManager->getBuilder(MutableBookModel::class)->storeStrategy($storeStrategy);
         $builder->attributeDefinitions([
             'id:pk' => ['mapTo' => '_id'],
             'title:string',

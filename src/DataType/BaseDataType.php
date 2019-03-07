@@ -21,23 +21,23 @@ use Sayla\Util\Mixin\MixinSet;
 
 abstract class BaseDataType implements \Sayla\Objects\Contract\DataType
 {
-    /** @var ObjectDispatcher */
-    protected $dispatcher;
-    /** @var \Sayla\Objects\Transformers\ValueTransformerFactory */
-    protected $valueFactory;
     /** @var array */
     protected $attributeDefinitions;
-    /**
-     * @var string
-     */
-    protected $objectClass;
     /** @var AttributeFactory */
     protected $attributeDescriptors;
+    /** @var ObjectDispatcher */
+    protected $dispatcher;
     /**
      * @var string
      */
     protected $name;
+    /**
+     * @var string
+     */
+    protected $objectClass;
     protected $propertyTypes;
+    /** @var \Sayla\Objects\Transformers\ValueTransformerFactory */
+    protected $valueFactory;
     private $descriptor;
 
     /**
@@ -129,6 +129,16 @@ abstract class BaseDataType implements \Sayla\Objects\Contract\DataType
     public function getName(): string
     {
         return $this->name;
+    }
+
+    /**
+     * @param \Sayla\Objects\DataObject|array $object
+     * @return array
+     */
+    protected function getNonResolvableAttributes($object): array
+    {
+        $array = is_array($object) ? $object : $object->toArray();
+        return array_except($array, $this->getDescriptor()->getResolvable());
     }
 
     /**
@@ -251,21 +261,6 @@ abstract class BaseDataType implements \Sayla\Objects\Contract\DataType
         return $object;
     }
 
-    public function newCollection()
-    {
-        return ObjectCollection::makeObjectCollection($this->name);
-    }
-
-    /**
-     * @param \Sayla\Objects\DataObject|array $object
-     * @return array
-     */
-    protected function getNonResolvableAttributes($object): array
-    {
-        $array = is_array($object) ? $object : $object->toArray();
-        return array_except($array, $this->getDescriptor()->getResolvable());
-    }
-
     protected function makeDataTypeDescriptor(): DataTypeDescriptor
     {
         $names = $this->getAttributeNames();
@@ -288,5 +283,10 @@ abstract class BaseDataType implements \Sayla\Objects\Contract\DataType
         }
         $dataTypeDescriptor->setMixins($mixins);
         return $dataTypeDescriptor;
+    }
+
+    public function newCollection()
+    {
+        return ObjectCollection::makeObjectCollection($this->name);
     }
 }

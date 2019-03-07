@@ -2,16 +2,36 @@
 
 namespace Sayla\Objects\Support\Illuminate;
 
+use Illuminate\Container\Container;
 use Illuminate\Database\Eloquent\Model;
+use Sayla\Objects\Contract\ConfigurableStore;
 use Sayla\Objects\Contract\ObjectStore;
 use Sayla\Objects\DataModel;
+use Symfony\Component\OptionsResolver\OptionsResolver;
 
 
-class ModelStore implements ObjectStore
+class ModelStore implements ObjectStore, ConfigurableStore
 {
     protected $useTransactions = false;
     /** @var Model */
     protected $model;
+    
+    public static function defineOptions(OptionsResolver $resolver): void {
+        $resolver->setRequired('model');
+        $resolver->setAllowedTypes('model', ['string', \Illuminate\Database\Eloquent\Model::class]);
+        $resolver->setDefault('useTransactions', false);
+        $resolver->setAllowedTypes('useTransactions', 'boolean');
+        $resolver->setNormalizer('model', function($model): \Illuminate\Database\Eloquent\Model{
+            if (is_string($model))
+                return Container::getInstance()->make($model);
+            return $model;
+        });
+    }
+
+    public function setOptions(array $options): void {
+        $this->model = $options['model'];
+        $this->useTransactions = $options['useTransactions'];
+    }
 
     public function __toString(): string
     {

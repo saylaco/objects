@@ -4,6 +4,7 @@ namespace Sayla\Objects;
 
 use Psr\Container\ContainerInterface;
 use Sayla\Objects\DataType\DataTypeManager;
+use Sayla\Objects\Stores\StoreManager;
 use Sayla\Objects\Transformers\ValueTransformerFactory;
 use Sayla\Support\Bindings\BindingProvider;
 
@@ -16,6 +17,12 @@ class ObjectsBindings extends BindingProvider
     protected function getBindingSet(): array
     {
         return [
+            'storeManager' => [
+                StoreManager::class,
+                function () {
+                    return StoreManager::getInstance();
+                }
+            ],
             'dataTypeManager' => [
                 DataTypeManager::class,
                 function () {
