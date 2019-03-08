@@ -4,10 +4,13 @@ namespace Sayla\Objects\Transformers;
 
 use GlobIterator;
 use Sayla\Exception\Error;
+use Sayla\Objects\Contract\Serializes;
+use Sayla\Objects\Contract\SerializesTrait;
 use Sayla\Objects\Transformers\Transformer\DatetimeTransformer;
 
-class ValueTransformerFactory
+class ValueTransformerFactory implements Serializes
 {
+    use SerializesTrait;
     private static $instance;
     /** @var string[] */
     private static $sharedTransformerClasses = [];
@@ -63,9 +66,17 @@ class ValueTransformerFactory
     }
 
     /**
+     * @param string $type
+     * @return bool
+     */
+    public static function isSharedType(string $type): bool
+    {
+        return isset(self::$sharedTransformerClasses[$type]);
+    }
+
+    /**
      * @param string $valueTransformerClass
      * @param string|null $typeName
-     * @return $this
      * @throws \Sayla\Exception\Error
      */
     public static function shareType(string $valueTransformerClass, string $typeName = null)
@@ -77,6 +88,14 @@ class ValueTransformerFactory
             throw new Error('Transformer type is already shared: ' . $typeName);
         }
         self::$sharedTransformerClasses[$typeName] = $valueTransformerClass;
+    }
+
+    /**
+     * @return iterable
+     */
+    public static function unserializableInstanceProperties(): iterable
+    {
+        return ['container'];
     }
 
     /**
@@ -146,15 +165,6 @@ class ValueTransformerFactory
      * @param string $type
      * @return bool
      */
-    public static function isSharedType(string $type): bool
-    {
-        return isset(self::$sharedTransformerClasses[$type]);
-    }
-
-    /**
-     * @param string $type
-     * @return bool
-     */
     public function isSupportedType(string $type): bool
     {
         return $this->isInstanceType($type) || self::isSharedType($type);
@@ -190,5 +200,4 @@ class ValueTransformerFactory
     {
         return $type == 'object' || $type == 'collection' || $type == 'datetime' || class_exists($type);
     }
-
 }

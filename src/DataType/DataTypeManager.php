@@ -65,7 +65,7 @@ class DataTypeManager implements \IteratorAggregate, Arrayable
     public function get(string $name): DataType
     {
         if (!$this->has($name) && is_subclass_of($name, DataObject::class)) {
-            $this->getBuilder($name)->build();
+            $this->dataTypes[$name] = $this->getBuilder($name)->build();
         }
         $name = $this->aliases[$name] ?? $name;
 
@@ -74,12 +74,7 @@ class DataTypeManager implements \IteratorAggregate, Arrayable
 
     public function getBuilder(string $objectClass): Builder
     {
-        $builder = new Builder($objectClass);
-        $builder->onPostBuild(function (DataType $dataType) {
-            $this->add($dataType);
-        });
-        return $builder;
-
+        return new Builder($objectClass);
     }
 
     public function getDescriptor(string $name): DataTypeDescriptor

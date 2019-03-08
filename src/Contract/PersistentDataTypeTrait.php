@@ -2,20 +2,22 @@
 
 namespace Sayla\Objects\Contract;
 
+use Sayla\Objects\Stores\StoreManager;
+
 trait PersistentDataTypeTrait
 {
 
     /**
      * @var \Sayla\Objects\Contract\ObjectStore
      */
-    protected $storeStrategy;
+    protected $storeName;
 
     /**
      * @return \Sayla\Objects\Contract\ObjectStore
      */
     public function getStoreStrategy(): \Sayla\Objects\Contract\ObjectStore
     {
-        return $this->storeStrategy;
+        return StoreManager::getInstance()->get($this->storeName);
     }
 
     public function onCreate($listener)

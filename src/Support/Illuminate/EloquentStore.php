@@ -10,7 +10,7 @@ use Sayla\Objects\DataModel;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 
-class ModelStore implements ObjectStore, ConfigurableStore
+class EloquentStore implements ObjectStore, ConfigurableStore
 {
     protected $useTransactions = false;
     /** @var Model */
@@ -28,8 +28,8 @@ class ModelStore implements ObjectStore, ConfigurableStore
         });
     }
 
-    public function setOptions(array $options): void {
-        $this->model = $options['model'];
+    public function setOptions(string $name, array $options): void {
+        $this->model = $options['model'] ??  $name;
         $this->useTransactions = $options['useTransactions'];
     }
 

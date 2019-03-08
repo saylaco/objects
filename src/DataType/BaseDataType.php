@@ -109,6 +109,7 @@ abstract class BaseDataType implements \Sayla\Objects\Contract\DataType
     /**
      * @param string $propertyType
      * @return \Illuminate\Support\Collection|\Sayla\Objects\Contract\Property[]
+     * @throws \Sayla\Exception\Error
      */
     public function getDefinedProperties(string $propertyType)
     {

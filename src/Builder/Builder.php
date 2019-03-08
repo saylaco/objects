@@ -4,11 +4,9 @@ namespace Sayla\Objects\Builder;
 
 use Sayla\Objects\Attribute\PropertyTypeSet;
 use Sayla\Objects\Contract\DataType;
-use Sayla\Objects\Contract\ObjectStore;
 use Sayla\Objects\Contract\PropertyType;
 use Sayla\Objects\DataType\StandardDataType;
 use Sayla\Objects\DataType\StoringDataType;
-use Sayla\Objects\Stores\StoreManager;
 use Sayla\Objects\Transformers\ValueTransformerFactory;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
@@ -19,6 +17,7 @@ class Builder
     /** @var callable */
     protected $optionsCallback;
     protected $options = [];
+    protected $store = null;
     /** @var PropertyType[] */
     protected $propertyTypes = [];
     private $resolvedOptions;
@@ -66,7 +65,7 @@ class Builder
      */
     public function build()
     {
-        $dataType = $this->makeDataType();
+        $dataType = self::makeDataType($this->getDataTypeClass(), $this->getOptions());
         if (filled($this->buildCallbacks)) {
             $callbacks = $this->buildCallbacks;
             $postBuild = array_pull($callbacks, 'post');
@@ -80,15 +79,13 @@ class Builder
     }
 
     /**
-     * @return mixed
+     * @param string|DataType $dataTypeClass
+     * @param array $options
+     * @return \Sayla\Objects\Contract\DataType
      */
-    protected function makeDataType(): DataType
+    public static function makeDataType(string $dataTypeClass, array $options): DataType
     {
-        if (!isset($this->resolvedOptions)) {
-            $this->resolvedOptions = $this->getOptions();
-        }
-        $dataType = forward_static_call($this->getDataTypeClass() . '::build', $this->resolvedOptions);
-        return $dataType;
+        return forward_static_call([$dataTypeClass, 'build'], $options);
     }
 
     public function getOptions(): array
@@ -128,18 +125,6 @@ class Builder
         return $this;
     }
 
-    public function onBuild(callable $callback)
-    {
-        $this->buildCallbacks[] = $callback;
-        return $this;
-    }
-
-    public function onPostBuild(callable $callback)
-    {
-        $this->buildCallbacks['post'] = $callback;
-        return $this;
-    }
-
     public function onOptionsResolution(callable $callback)
     {
         $this->optionsCallback = $callback;
@@ -156,24 +141,17 @@ class Builder
         return $this;
     }
 
-    public function storeDriver(string $driver, array $options = [])
+    public function store(string $driver, array $options = [], string $storeName = null)
     {
         if (!isset($this->dataTypeClass)) {
             $this->setDataTypeClass(StoringDataType::class);
         }
-        if (!isset($this->options['storeName'])) {
-            $this->options['storeName'] = $this->options['objectClass'];
-        }
-        StoreManager::getInstance()->addStore($this->options['storeName'], $driver, $options);
-        return $this;
-    }
-
-    public function storeStrategy(ObjectStore $value)
-    {
-        if (!isset($this->dataTypeClass)) {
-            $this->setDataTypeClass(StoringDataType::class);
-        }
-        $this->options[__FUNCTION__] = $value;
+        $this->store = [
+            'name' => $storeName ?? $this->options['objectClass'],
+            'options' => $options,
+            'driver' => $driver,
+        ];
+        $this->options['storeName'] = $this->store['name'];
         return $this;
     }
 
@@ -204,4 +182,11 @@ class Builder
         return $this->dataTypeClass ?? StandardDataType::class;
     }
 
+    /**
+     * @return array
+     */
+    public function getStoreOptions(): ?array
+    {
+        return $this->store;
+    }
 }

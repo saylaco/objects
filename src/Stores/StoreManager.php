@@ -5,6 +5,7 @@ namespace Sayla\Objects\Stores;
 use Illuminate\Contracts\Container\Container;
 use Sayla\Objects\Contract\ConfigurableStore;
 use Sayla\Objects\Contract\ObjectStore;
+use Sayla\Objects\Support\Illuminate\EloquentStore;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class StoreManager
@@ -110,6 +111,12 @@ class StoreManager
     {
         return $this->container->make(ArrayStore::class);
     }
+    
+    protected function createEloquentDriver(): EloquentStore
+    {
+        return $this->container->make(EloquentStore::class);
+    }
+
 
     /**
      * Unset the given driver instances.
@@ -135,7 +142,7 @@ class StoreManager
      * @param  \Closure $callback
      * @return $this
      */
-    public function extend($driver, Closure $callback)
+    public function extend($driver, \Closure $callback)
     {
         $this->customCreators[$driver] = $callback->bindTo($this, $this);
 

@@ -11,23 +11,23 @@ class DataTypeDescriptor
     /** @var \Sayla\Util\Mixin\MixinSet[] */
     private static $mixins = [];
     protected $resolvable = [];
-    /** @var \Sayla\Objects\ObjectDispatcher */
-    private $eventDispatcher;
+    /** @var \Illuminate\Support\Collection|\Sayla\Objects\Contract\Property[] */
+    private $access;
+    private $attributeNames = [];
     /** @var string|\Sayla\Objects\DataObject */
     private $class;
     /** @var string */
     private $dataType;
-    private $attributeNames = [];
-    /** @var \Illuminate\Support\Collection|\Sayla\Objects\Contract\Property[] */
-    private $access;
-    /** @var \Illuminate\Support\Collection|\Sayla\Objects\Contract\Property[] */
-    private $visible;
     /** @var \Illuminate\Support\Collection|\Sayla\Objects\Contract\Property[] */
     private $defaults;
+    /** @var \Sayla\Objects\ObjectDispatcher */
+    private $eventDispatcher;
+    /** @var \Illuminate\Support\Collection|\Sayla\Objects\Contract\Property[] */
+    private $getFilters = [];
     /** @var \Illuminate\Support\Collection|\Sayla\Objects\Contract\Property[] */
     private $setFilters = [];
     /** @var \Illuminate\Support\Collection|\Sayla\Objects\Contract\Property[] */
-    private $getFilters = [];
+    private $visible;
 
     /**
      * DataTypeDescriptor constructor.
@@ -65,19 +65,6 @@ class DataTypeDescriptor
         $this->setMixins($mixins ?? new MixinSet());
     }
 
-    /**
-     * @param \Sayla\Util\Mixin\MixinSet $mixins
-     */
-    public function setMixins(\Sayla\Util\Mixin\MixinSet $mixins): void
-    {
-        self::$mixins[$this->getDataType()] = $mixins;
-    }
-
-    public function getDataType(): string
-    {
-        return $this->dataType;
-    }
-
     public function __call($name, $arguments)
     {
         return self::$mixins[$this->getDataType()]->call($name, $arguments);
@@ -86,6 +73,11 @@ class DataTypeDescriptor
     public function getAttributeNames()
     {
         return $this->attributeNames;
+    }
+
+    public function getDataType(): string
+    {
+        return $this->dataType;
     }
 
     public function getDefaultValues(): array
@@ -126,6 +118,21 @@ class DataTypeDescriptor
     public function getResolvable()
     {
         return $this->resolvable->keys()->all();
+    }
+
+    /**
+     * @param string $attributeName
+     * @return \Sayla\Objects\Contract\AttributeResolver
+     * @throws \Sayla\Objects\Exception\AttributeResolverNotFound
+     */
+    public function getResolver(string $attributeName): \Sayla\Objects\Contract\AttributeResolver
+    {
+        if (!isset($this->resolvable[$attributeName])) {
+            throw new AttributeResolverNotFound('Resolver not found for ' . $this->dataType . '.$' . $attributeName);
+        }
+        /** @var \Sayla\Objects\Contract\AttributeResolver $resolver */
+        $resolver = $this->resolvable[$attributeName]['delegate'];
+        return $resolver;
     }
 
     public function getSetFilters($attributeName)
@@ -190,17 +197,10 @@ class DataTypeDescriptor
     }
 
     /**
-     * @param string $attributeName
-     * @return \Sayla\Objects\Contract\AttributeResolver
-     * @throws \Sayla\Objects\Exception\AttributeResolverNotFound
+     * @param \Sayla\Util\Mixin\MixinSet $mixins
      */
-    public function getResolver(string $attributeName): \Sayla\Objects\Contract\AttributeResolver
+    public function setMixins(\Sayla\Util\Mixin\MixinSet $mixins): void
     {
-        if (!isset($this->resolvable[$attributeName])) {
-            throw new AttributeResolverNotFound('Resolver not found for ' . $this->dataType . '.$' . $attributeName);
-        }
-        /** @var \Sayla\Objects\Contract\AttributeResolver $resolver */
-        $resolver = $this->resolvable[$attributeName]['delegate'];
-        return $resolver;
+        self::$mixins[$this->getDataType()] = $mixins;
     }
 }
