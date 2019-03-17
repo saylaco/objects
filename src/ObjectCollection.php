@@ -3,6 +3,7 @@
 namespace Sayla\Objects;
 
 use Illuminate\Support\Collection;
+use Sayla\Data\JavascriptObject;
 use Sayla\Exception\InvalidValue;
 use Sayla\Objects\Contract\NonCachableAttribute;
 use Sayla\Objects\DataType\DataTypeDescriptor;
@@ -13,10 +14,10 @@ use Sayla\Objects\DataType\DataTypeManager;
  */
 class ObjectCollection extends Collection
 {
-    protected $dataType = DataObject::class;
     protected $allowNullItems = false;
-    protected $requireItemKey = false;
+    protected $dataType = DataObject::class;
     protected $keyAttribute;
+    protected $requireItemKey = false;
 
     /**
      * @param string $descriptor
@@ -56,6 +57,14 @@ class ObjectCollection extends Collection
         return $this->dataType;
     }
 
+    /**
+     * @return \Sayla\Objects\DataType\DataTypeDescriptor
+     */
+    protected function getItemDescriptor(): DataTypeDescriptor
+    {
+        return DataTypeManager::getInstance()->getDescriptor($this->dataType);
+    }
+
     public function groupBy($groupBy, $preserveKeys = false)
     {
         $results = $this->toBase()->groupBy($groupBy, $preserveKeys);
@@ -69,6 +78,14 @@ class ObjectCollection extends Collection
         return $results;
     }
 
+    /**
+     * @return bool
+     */
+    protected function isForcingKeys(): bool
+    {
+        return $this->keyAttribute != null;
+    }
+
     public function jsonSerialize(bool $valuesOnly = false)
     {
         if ($valuesOnly || !$this->isForcingKeys()) {
@@ -80,6 +97,32 @@ class ObjectCollection extends Collection
     public function keys()
     {
         return parent::keys()->toBase();
+    }
+
+    /**
+     * @param $item
+     * @return \Sayla\Objects\DataObject
+     * @throws \Sayla\Objects\Exception\HydrationError
+     */
+    protected function makeObject($item)
+    {
+        return DataTypeManager::getInstance()->get($this->dataType)->hydrate($item);
+    }
+
+    /**
+     * @param $items
+     * @return $this
+     */
+    public function makeObjects($items)
+    {
+        foreach ($items as $i => $item) {
+            if (!$item instanceof $this->dataType) {
+                $this->push($this->makeObject($item));
+            } else {
+                $this->push($item);
+            }
+        }
+        return $this;
     }
 
     /**
@@ -122,73 +165,10 @@ class ObjectCollection extends Collection
         return parent::pluck($value, $key)->toBase();
     }
 
-    protected function validateItemType($value)
-    {
-        if ($this->allowNullItems && $value === null) {
-            return;
-        }
-        $itemDescriptor = $this->getItemDescriptor();
-        if (!is_a($value, $itemDescriptor->getObjectClass())
-            && !is_subclass_of($value, $itemDescriptor->getObjectClass())
-            && ($value->getDataType() != $itemDescriptor->getDataType())
-            && (get_class($value) != $itemDescriptor->getObjectClass())
-        ) {
-            throw new InvalidValue("An item must a '{$this->dataType}' object");
-        }
-    }
-
-    /**
-     * @return \Sayla\Objects\DataType\DataTypeDescriptor
-     */
-    protected function getItemDescriptor(): DataTypeDescriptor
-    {
-        return DataTypeManager::getInstance()->getDescriptor($this->dataType);
-    }
-
-    /**
-     * @return bool
-     */
-    protected function isForcingKeys(): bool
-    {
-        return $this->keyAttribute != null;
-    }
-
-    protected function validateItemKey($key)
-    {
-        if ($this->requireItemKey && $key === null) {
-            throw new InvalidValue('An item must have a non null key');
-        }
-    }
-
-    /**
-     * @param $items
-     * @return $this
-     */
-    public function makeObjects($items)
-    {
-        foreach ($items as $i => $item) {
-            if (!$item instanceof $this->dataType) {
-                $this->push($this->makeObject($item));
-            } else {
-                $this->push($item);
-            }
-        }
-        return $this;
-    }
-
-    /**
-     * @param $item
-     * @return \Sayla\Objects\DataObject
-     * @throws \Sayla\Objects\Exception\HydrationError
-     */
-    protected function makeObject($item)
-    {
-        return DataTypeManager::getInstance()->get($this->dataType)->hydrate($item);
-    }
-
     /**
      * @param array ...$attributes
      * @return static
+     * @throws \Sayla\Objects\Exception\AttributeResolverNotFound
      */
     public function resolve(...$attributes)
     {
@@ -212,8 +192,35 @@ class ObjectCollection extends Collection
         return $this;
     }
 
+    public function toJsObject(): JavascriptObject
+    {
+        return new JavascriptObject($this->items);
+    }
+
     public function toPrettyJson()
     {
         return json_encode($this->jsonSerialize(), JSON_PRETTY_PRINT);
+    }
+
+    protected function validateItemKey($key)
+    {
+        if ($this->requireItemKey && $key === null) {
+            throw new InvalidValue('An item must have a non null key');
+        }
+    }
+
+    protected function validateItemType($value)
+    {
+        if ($this->allowNullItems && $value === null) {
+            return;
+        }
+        $itemDescriptor = $this->getItemDescriptor();
+        if (!is_a($value, $itemDescriptor->getObjectClass())
+            && !is_subclass_of($value, $itemDescriptor->getObjectClass())
+            && ($value->getDataType() != $itemDescriptor->getDataType())
+            && (get_class($value) != $itemDescriptor->getObjectClass())
+        ) {
+            throw new InvalidValue("An item must a '{$this->dataType}' object");
+        }
     }
 }

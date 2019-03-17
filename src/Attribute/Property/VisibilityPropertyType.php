@@ -3,9 +3,16 @@
 namespace Sayla\Objects\Attribute\Property;
 
 use Sayla\Objects\Contract\PropertyType;
+use Sayla\Objects\Contract\ProvidesDataTypeDescriptorMixin;
+use Sayla\Util\Mixin\Mixin;
 
-class VisibilityPropertyType implements PropertyType
+class VisibilityPropertyType implements PropertyType, ProvidesDataTypeDescriptorMixin
 {
+
+    public function getDataTypeDescriptorMixin(string $dataType, array $properties): Mixin
+    {
+        return new VisibilityDescriptorMixin($properties);
+    }
 
     /**
      * @return string[]|void

@@ -9,30 +9,21 @@ use Sayla\Objects\Stores\StoreManager;
 class DataTypeRegistrar
 {
     /**
-     * @var \Sayla\Objects\DataType\DataTypeManager
-     */
-    private $dataTypes;
-    /**
      * @var \Sayla\Objects\Contract\RegistrarRepository
      */
     private $repository;
-    /**
-     * @var \Sayla\Objects\Stores\StoreManager
-     */
-    private $stores;
 
-    public function __construct(DataTypeManager $dataTypes, StoreManager $stores, RegistrarRepository $repository)
+    public function __construct(RegistrarRepository $repository)
     {
         $this->repository = $repository;
-        $this->dataTypes = $dataTypes;
-        $this->stores = $stores;
     }
 
     /**
      * @param string $objectName
      * @param Builder|\Closure $builder
+     * @return Builder
      */
-    public function addDataType(string $objectName, $builder)
+    public function addDataType(string $objectName, $builder): Builder
     {
         if ($builder instanceof \Closure) {
             $resolver = $builder;
@@ -40,15 +31,16 @@ class DataTypeRegistrar
             call_user_func($resolver, $builder);
         }
         $this->repository->addObject($objectName, $builder);
+        return $builder;
     }
 
-    public function addDataTypes()
+    public function addDataTypes(DataTypeManager $dataTypes, StoreManager $stores)
     {
         foreach ($this->repository->getObjects() as $info) {
             if ($info->store) {
-                $this->stores->addStore($info->store['name'], $info->store['driver'], $info->store['options']);
+                $stores->addStore($info->store['name'], $info->store['options']);
             }
-            $this->dataTypes->add(Builder::makeDataType(
+            $dataTypes->add(Builder::makeDataType(
                 $info->dataTypeClass,
                 $this->repository->getOptions($info->name)
             ));

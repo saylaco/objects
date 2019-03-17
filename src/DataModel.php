@@ -13,7 +13,7 @@ use Sayla\Objects\Contract\Storable;
  * @property callable|int __beforeUpdate
  * @property callable|int __beforeDelete
  * @property callable|int __beforeSave
- * @method \Sayla\Objects\Contract\PersistentDataType|\Sayla\Objects\DataType\StoringDataType datatype()
+ * @method Contract\PersistentDataType datatype()
  */
 abstract class DataModel extends DataObject implements Storable
 {
@@ -28,7 +28,7 @@ abstract class DataModel extends DataObject implements Storable
         $dataModel('beforeCreate');
         $newAttributes = $dataModel->dataType()->getStoreStrategy()->create($dataModel);
         if (is_iterable($newAttributes)) {
-            $dataModel->init($newAttributes);
+            $dataModel->init($dataModel->dataType()->hydrateData($newAttributes));
         }
         $dataModel('afterCreate');
         $dataModel->clearModifiedAttributeFlags();
@@ -42,7 +42,7 @@ abstract class DataModel extends DataObject implements Storable
         $dataModel('beforeDelete');
         $newAttributes = $dataModel->dataType()->getStoreStrategy()->delete($dataModel);
         if (is_iterable($newAttributes)) {
-            $dataModel->init($newAttributes);
+            $dataModel->init($dataModel->dataType()->hydrateData($newAttributes));
         }
         $dataModel('afterDelete');
         $dataModel->clearModifiedAttributeFlags();
@@ -70,10 +70,27 @@ abstract class DataModel extends DataObject implements Storable
         $dataModel('beforeUpdate');
         $newAttributes = $dataModel->dataType()->getStoreStrategy()->update($dataModel);
         if (is_iterable($newAttributes)) {
-            $dataModel->init($newAttributes);
+            $dataModel->init($dataModel->dataType()->hydrateData($newAttributes));
         }
         $dataModel('afterUpdate');
         $dataModel->clearModifiedAttributeFlags();
+    }
+
+
+    public static function onCreate($listener)
+    {
+        static::getDescriptor()->dispatcher()->on('create', $listener);
+    }
+
+
+    public static function onDelete($listener)
+    {
+        static::getDescriptor()->dispatcher()->on('delete', $listener);
+    }
+
+    public static function onUpdate($listener)
+    {
+        static::getDescriptor()->dispatcher()->on('update', $listener);
     }
 
     public function create()

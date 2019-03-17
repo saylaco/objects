@@ -5,6 +5,7 @@ namespace Sayla\Objects\Stores;
 use Illuminate\Contracts\Container\Container;
 use Sayla\Objects\Contract\ConfigurableStore;
 use Sayla\Objects\Contract\ObjectStore;
+use Sayla\Objects\Stores\FileStore\FileRepoStore;
 use Sayla\Objects\Support\Illuminate\EloquentStore;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
@@ -30,9 +31,11 @@ class StoreManager
      */
     protected $customCreators = [];
 
-    private $storeConfigs = [];
+    private $storeOptions = [];
 
     private $driverOptionResolvers = [];
+    /** @var callable */
+    private $optionsLoader;
 
     /**
      * Create a new Cache manager instance.
@@ -44,7 +47,7 @@ class StoreManager
     {
         $this->container = $container;
     }
-    
+
     public static function getInstance(): self
     {
         return self::$instance ?? (self::$instance = new self(\Illuminate\Container\Container::getInstance()));
@@ -69,9 +72,14 @@ class StoreManager
         return $this->stores[$name] = $this->store($name);
     }
 
-    public function addStore(string $name, string $driver, array $options)
+    public function getOptions($name): array
     {
-        return $this->storeConfigs[$name] = compact('driver', 'options');
+        return $this->storeOptions[$name]['options'];
+    }
+
+    public function addStore(string $name, array $options)
+    {
+        return $this->storeOptions[$name] = $options;
     }
 
     public function store($name): ObjectStore
@@ -81,23 +89,29 @@ class StoreManager
 
     protected function resolve(string $name): ObjectStore
     {
-        $config = $this->storeConfigs[$name] ?? null;
-
-        if (is_null($config)) {
-            throw new \InvalidArgumentException("Object store [{$name}] is not defined.");
+        if (!$this->storeOptions[$name] && $this->optionsLoader) {
+            $this->storeOptions[$name] = call_user_func($this->optionsLoader, $name);
         }
 
-        $store = isset($this->customCreators[$config['driver']])
+        $config = $this->storeOptions[$name] ?? null;
+        if (empty($config)) {
+            throw new \InvalidArgumentException("Object store [{$name}] is not defined.");
+        }
+        $driver = array_pull($config, 'driver');
+        if (empty($driver)) {
+            throw new \InvalidArgumentException("Object store [{$name}] does not have a defined driver.");
+        }
+        $store = isset($this->customCreators[$driver])
             ? $this->callCustomCreator($name, $config)
-            : $this->createDriver($config['driver']);
+            : $this->createDriver($driver);
         if ($store instanceof ConfigurableStore) {
-            if (!isset($this->driverOptionResolvers[$config['driver']])) {
+            if (!isset($this->driverOptionResolvers[$driver])) {
                 $resolver = new OptionsResolver();
                 $store::defineOptions($resolver);
-                $this->driverOptionResolvers[$config['driver']] = $resolver;
+                $this->driverOptionResolvers[$driver] = $resolver;
             }
-            $optionResolver = $this->driverOptionResolvers[$config['driver']];
-            $store->setOptions($name, $optionResolver->resolve($config['options']));
+            $optionResolver = $this->driverOptionResolvers[$driver];
+            $store->setOptions($name, $optionResolver->resolve($config));
         }
         return $store;
     }
@@ -107,11 +121,11 @@ class StoreManager
         return $this->customCreators[$config['driver']]($this->container, $config, $name);
     }
 
-    protected function createArrayDriver(): ArrayStore
+    protected function createFileDriver(): FileRepoStore
     {
-        return $this->container->make(ArrayStore::class);
+        return $this->container->make(FileRepoStore::class);
     }
-    
+
     protected function createEloquentDriver(): EloquentStore
     {
         return $this->container->make(EloquentStore::class);
@@ -146,6 +160,16 @@ class StoreManager
     {
         $this->customCreators[$driver] = $callback->bindTo($this, $this);
 
+        return $this;
+    }
+
+    /**
+     * @param callable $optionsLoader
+     * @return $this
+     */
+    public function setOptionsLoader(callable $optionsLoader)
+    {
+        $this->optionsLoader = $optionsLoader;
         return $this;
     }
 }

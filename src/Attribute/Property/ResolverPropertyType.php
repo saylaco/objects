@@ -8,10 +8,22 @@ use Sayla\Objects\Attribute\Resolver\CallableResolver;
 use Sayla\Objects\Attribute\Resolver\ResolverDelegate;
 use Sayla\Objects\Contract\AttributeResolver;
 use Sayla\Objects\Contract\PropertyType;
+use Sayla\Objects\Contract\ProvidesDataTypeDescriptorMixin;
 use Sayla\Objects\Exception\PropertyError;
+use Sayla\Util\Mixin\Mixin;
 
-class ResolverPropertyType implements PropertyType
+class ResolverPropertyType implements PropertyType, ProvidesDataTypeDescriptorMixin
 {
+
+    public static function getHandle(): string
+    {
+        return 'resolver';
+    }
+
+    public function getDataTypeDescriptorMixin(string $dataType, array $properties): Mixin
+    {
+        return new ResolverDescriptorMixin(array_filter($properties), $dataType);
+    }
 
     /**
      * @return string[]
@@ -21,9 +33,22 @@ class ResolverPropertyType implements PropertyType
         return ['autoResolve', self::getHandle()];
     }
 
-    public static function getHandle(): string
+    /**
+     * @param \ReflectionClass $reflection
+     * @param string $attributeName
+     * @return \Sayla\Objects\Contract\AttributeResolver|null
+     * @throws \ReflectionException
+     * @throws \Sayla\Exception\Error
+     */
+    protected function getMultipleResolver(\ReflectionClass $reflection, string $attributeName): ?AttributeResolver
     {
-        return 'resolver';
+        if ($reflection->hasMethod($method = 'resolve' . studly_case($attributeName) . 'Attributes')) {
+            if (!$reflection->getMethod($method)->isStatic()) {
+                throw new Error($reflection->name . '::' . $method . ' must be static');
+            }
+            return new CallableResolver($reflection->name . '::' . $method);
+        }
+        return null;
     }
 
     public function getName(): string
@@ -61,20 +86,6 @@ class ResolverPropertyType implements PropertyType
         return $config;
     }
 
-    private function normalizeResolver($attributeName, $resolver): AttributeResolver
-    {
-        if ($resolver instanceof AttributeResolver) {
-            return $resolver;
-        }
-        if (is_string($resolver) && starts_with($resolver, '@')) {
-            // create a alias resolver:
-            // @getRealValue => $object->getRealValue($attributeName)
-            $alias = substr($resolver, 1) . '(' . var_str($attributeName) . ')';
-            return new AliasResolver($alias);
-        }
-        return new CallableResolver($resolver);
-    }
-
     /**
      * @param \ReflectionClass $reflection
      * @param string $attributeName
@@ -92,20 +103,17 @@ class ResolverPropertyType implements PropertyType
         return null;
     }
 
-    /**
-     * @param \ReflectionClass $reflection
-     * @param string $attributeName
-     * @return null|\Sayla\Objects\Contract\AttributeResolver
-     * @throws \Sayla\Exception\Error
-     */
-    protected function getMultipleResolver(\ReflectionClass $reflection, string $attributeName): ?AttributeResolver
+    private function normalizeResolver($attributeName, $resolver): AttributeResolver
     {
-        if ($reflection->hasMethod($method = 'resolve' . studly_case($attributeName) . 'Attributes')) {
-            if (!$reflection->getMethod($method)->isStatic()) {
-                throw new Error($reflection->name . '::' . $method . ' must be static');
-            }
-            return new CallableResolver($reflection->name . '::' . $method);
+        if ($resolver instanceof AttributeResolver) {
+            return $resolver;
         }
-        return null;
+        if (is_string($resolver) && starts_with($resolver, '@')) {
+            // create a alias resolver:
+            // @getRealValue => $object->getRealValue($attributeName)
+            $alias = substr($resolver, 1) . '(' . var_str($attributeName) . ')';
+            return new AliasResolver($alias);
+        }
+        return new CallableResolver($resolver);
     }
 }

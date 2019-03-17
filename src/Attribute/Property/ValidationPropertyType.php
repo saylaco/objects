@@ -4,6 +4,7 @@ namespace Sayla\Objects\Attribute\Property;
 
 use Illuminate\Support\Str;
 use Sayla\Objects\Contract\PropertyType;
+use Sayla\Util\Mixin\Mixin;
 
 class ValidationPropertyType implements PropertyType
 {

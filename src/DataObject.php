@@ -18,10 +18,11 @@ class DataObject extends AttributableObject
     use TriggerableTrait;
     const TRIGGER_PREFIX = '__';
     protected static $unguarded = false;
+    protected const DATA_TYPE = null;
     private $initializing = false;
+    private $modifiedAttributes = [];
     private $resolving = false;
     private $setObjectProperties = false;
-    private $modifiedAttributes = [];
 
     /**
      * @param array $attributes
@@ -33,63 +34,19 @@ class DataObject extends AttributableObject
         }
     }
 
-    /**
-     * @param iterable $attributes
-     * @return \Sayla\Objects\DataObject
-     */
-    final public function init(iterable $attributes): self
-    {
-        $this->initializing = true;
-        $this->initialize($attributes);
-        $this->initializing = false;
-        return $this;
-    }
-
-    /**
-     * @param $attributes
-     */
-    protected function initialize($attributes): void
-    {
-        foreach ($attributes as $key => $value) {
-            $this->setRawAttribute($key, $this->runSetFilters($key, $value));
-        }
-    }
-
-    /**
-     * @param string $attributeName
-     * @param        $value
-     * @return mixed
-     */
-    private function runSetFilters(string $attributeName, $value)
-    {
-        foreach ($this->descriptor()->getSetFilters($attributeName) as $callable) {
-            if (is_string($callable) && starts_with($callable, '@')) {
-                $callable = [$this, substr($callable, 1)];
-            }
-            $value = call_user_func($callable, $value);
-        }
-        return $value;
-    }
-
     public static function newObjectCollection()
     {
-        if (self::getDataTypeManager()->has(static::class)) {
-            return self::getDataTypeManager()->get(static::class)->newCollection();
-        }
-        return ObjectCollection::make(static::class);
+        return static::getDescriptor()->newCollection();
     }
 
-    public static function unguarded(callable $callback)
+    /**
+     * Enable the mass assignment restrictions.
+     *
+     * @return void
+     */
+    public static function reguard()
     {
-        if (static::$unguarded) {
-            return $callback();
-        }
-        static::unguard();
-        try {
-            return $callback();
-        } finally {
-            static::reguard();
-        }
+        static::$unguarded = false;
     }
 
     /**
@@ -103,14 +60,17 @@ class DataObject extends AttributableObject
         static::$unguarded = $state;
     }
 
-    /**
-     * Enable the mass assignment restrictions.
-     *
-     * @return void
-     */
-    public static function reguard()
+    public static function unguarded(callable $callback)
     {
-        static::$unguarded = false;
+        if (static::$unguarded) {
+            return $callback();
+        }
+        static::unguard();
+        try {
+            return $callback();
+        } finally {
+            static::reguard();
+        }
     }
 
     public function __get($name)
@@ -139,6 +99,11 @@ class DataObject extends AttributableObject
         $this->offsetUnset($name);
     }
 
+    public function clearModifiedAttributeFlags()
+    {
+        $this->modifiedAttributes = [];
+    }
+
     protected function getAttributeValue(string $attributeName)
     {
         if (!$this->isAttributeSet($attributeName) && $this->descriptor()->hasResolver($attributeName)) {
@@ -152,9 +117,100 @@ class DataObject extends AttributableObject
         return $value;
     }
 
+    protected function getGuardedAttributeValue(string $attributeName)
+    {
+        if (!$this->isRetrievableAttribute($attributeName)) {
+            throw new InaccessibleAttribute(static::getDefinedDataType(), $attributeName, 'Not readable');
+        }
+        return $this->getAttributeValue($attributeName);
+    }
+
+    /**
+     * @return mixed[]
+     */
+    public function getModifiedAttributeNames(): array
+    {
+        return $this->modifiedAttributes;
+    }
+
+    /**
+     * @return mixed[]
+     */
+    public function getModifiedAttributes(): array
+    {
+        return array_only($this->toArray(), $this->modifiedAttributes);
+    }
+
+    /**
+     * @param iterable $attributes
+     * @return \Sayla\Objects\DataObject
+     */
+    final public function init(iterable $attributes): self
+    {
+        $this->initializing = true;
+        $this->initialize($attributes);
+        $this->initializing = false;
+        return $this;
+    }
+
+    /**
+     * @param $attributes
+     */
+    protected function initialize($attributes): void
+    {
+        foreach ($attributes as $key => $value) {
+            $this->setRawAttribute($key, $this->runSetFilters($key, $value));
+        }
+    }
+
+    /**
+     * @param string $attributeName
+     * @return bool
+     */
+    public function isAttributeReadable(string $attributeName): bool
+    {
+        if (static::$unguarded) {
+            return true;
+        }
+        return $this->descriptor()->isReadable($attributeName);
+    }
+
+    /**
+     * @param string $attributeName
+     * @return bool
+     */
+    public function isAttributeWritable(string $attributeName): bool
+    {
+        if (static::$unguarded) {
+            return true;
+        }
+        return $this->descriptor()->isWritable($attributeName);
+    }
+
+    /**
+     * @return bool
+     */
+    public function isInitializing(): bool
+    {
+        return $this->initializing;
+    }
+
+    public function isResolving(): bool
+    {
+        return $this->resolving;
+    }
+
     protected function isRetrievableAttribute(string $attributeName)
     {
         return parent::isRetrievableAttribute($attributeName) || $this->isAttributeReadable($attributeName);
+    }
+
+    /**
+     * @return bool
+     */
+    protected function isTrackingModifiedAttributes(): bool
+    {
+        return !$this->isInitializing() && !$this->isResolving();
     }
 
     public function offsetGet($offset)
@@ -178,65 +234,34 @@ class DataObject extends AttributableObject
         }
     }
 
-    public function serialize()
+    /**
+     * @return array
+     */
+    protected function realSerializableProperties(): array
     {
-        $properties = $this->realSerializableProperties();
-        return serialize($properties);
+        $properties = [];
+        $properties['attributes'] = $this->toArray();
+        $properties['initializing'] = $this->initializing;
+        return $properties;
     }
 
-    protected function setAttributeValue(string $attributeName, $value): void
+    public function resolve(...$attributes)
     {
-        if ($this->isTrackingModifiedAttributes()) {
-            $this->modifiedAttributes[$attributeName] = $attributeName;
-        }
-        parent::setAttributeValue($attributeName, $this->runSetFilters($attributeName, $value));
-    }
-
-    public function unserialize($serialized)
-    {
-        $this->setObjectProperties = true;
-        $properties = unserialize($serialized);
-        foreach ($properties as $k => $v) {
-            if ($k == 'attributes') {
-                $this->setAttributes($v);
-            } else {
-                $this->{$k} = $v;
+        $descriptor = $this->descriptor();
+        $this->resolving = true;
+        $model = $this;
+        $values = collect($attributes)->flatMap(function ($attributeName) use ($descriptor, $model) {
+            if ($descriptor->hasResolver($attributeName)) {
+                $resolver = $descriptor->getResolver($attributeName);
+                if (!($resolver instanceof NonCachableAttribute)) {
+                    return [$attributeName => $resolver->resolve($model)];
+                }
             }
-        }
-        $this->setObjectProperties = false;
-    }
-
-    protected function getGuardedAttributeValue(string $attributeName)
-    {
-        if (!$this->isRetrievableAttribute($attributeName)) {
-            throw new InaccessibleAttribute(static::class, $attributeName, 'Not readable');
-        }
-        return $this->getAttributeValue($attributeName);
-    }
-
-    /**
-     * @param string $attributeName
-     * @param $value
-     * @throws \Sayla\Objects\Exception\InaccessibleAttribute
-     */
-    protected function setGuardedAttributeValue(string $attributeName, $value)
-    {
-        if (!$this->isAttributeWritable($attributeName)) {
-            throw new InaccessibleAttribute(static::class, $attributeName, 'Not writable');
-        }
-        $this->setAttributeValue($attributeName, $value);
-    }
-
-    /**
-     * @param string $attributeName
-     * @return bool
-     */
-    public function isAttributeWritable(string $attributeName): bool
-    {
-        if (static::$unguarded) {
-            return true;
-        }
-        return $this->descriptor()->isWritable($attributeName);
+            return [];
+        });
+        $this->init($values->all());
+        $this->resolving = false;
+        return $this;
     }
 
     /**
@@ -254,11 +279,88 @@ class DataObject extends AttributableObject
             $resolver = $this->descriptor()->getResolver($attributeName);
             $value = $resolver->resolve($this);
             if (!($resolver instanceof NonCachableAttribute)) {
-                $this->setRawAttribute($attributeName, $value);
+                $this->init([$attributeName => $value]);
             }
         }
         $this->resolving = false;
         return $value;
+    }
+
+    public function serialize()
+    {
+        $properties = $this->realSerializableProperties();
+        return serialize($properties);
+    }
+
+    protected function setAttributeValue(string $attributeName, $value): void
+    {
+        if ($this->isTrackingModifiedAttributes()) {
+            $this->modifiedAttributes[$attributeName] = $attributeName;
+        }
+        parent::setAttributeValue($attributeName, $this->runSetFilters($attributeName, $value));
+    }
+
+    /**
+     * @param string $attributeName
+     * @param $value
+     * @throws \Sayla\Objects\Exception\InaccessibleAttribute
+     */
+    protected function setGuardedAttributeValue(string $attributeName, $value)
+    {
+        if (!$this->isAttributeWritable($attributeName)) {
+            throw new InaccessibleAttribute(static::getDefinedDataType(), $attributeName, 'Not writable');
+        }
+        $this->setAttributeValue($attributeName, $value);
+    }
+
+    /**
+     * Get items as an array of scalar values
+     *
+     * @return array
+     */
+    public function toScalarArray()
+    {
+        return simple_value($this->toArray());
+    }
+
+    /**
+     * @return array
+     */
+    public function toVisibleArray(): array
+    {
+        return array_only($this->toArray(), $this->descriptor()->getVisible());
+    }
+
+    /**
+     * @return \Sayla\Objects\AttributableObject
+     */
+    public function toVisibleObject()
+    {
+        return AttributableObject::make($this->toVisibleArray());
+    }
+
+    /**
+     * Get visible items as an array of scalar values
+     *
+     * @return array
+     */
+    public function toVisibleScalarArray()
+    {
+        return simple_value($this->toVisibleArray());
+    }
+
+    public function unserialize($serialized)
+    {
+        $this->setObjectProperties = true;
+        $properties = unserialize($serialized);
+        foreach ($properties as $k => $v) {
+            if ($k == 'attributes') {
+                $this->setAttributes($v);
+            } else {
+                $this->{$k} = $v;
+            }
+        }
+        $this->setObjectProperties = false;
     }
 
     /**
@@ -279,102 +381,17 @@ class DataObject extends AttributableObject
 
     /**
      * @param string $attributeName
-     * @return bool
+     * @param        $value
+     * @return mixed
      */
-    public function isAttributeReadable(string $attributeName): bool
+    private function runSetFilters(string $attributeName, $value)
     {
-        if (static::$unguarded) {
-            return true;
+        foreach ($this->descriptor()->getSetFilters($attributeName) as $callable) {
+            if (is_string($callable) && starts_with($callable, '@')) {
+                $callable = [$this, substr($callable, 1)];
+            }
+            $value = call_user_func($callable, $value);
         }
-        return $this->descriptor()->isReadable($attributeName);
-    }
-
-    /**
-     * @return array
-     */
-    protected function realSerializableProperties(): array
-    {
-        $properties = [];
-        $properties['attributes'] = $this->toArray();
-        $properties['initializing'] = $this->initializing;
-        return $properties;
-    }
-
-    /**
-     * @return bool
-     */
-    protected function isTrackingModifiedAttributes(): bool
-    {
-        return !$this->isInitializing() && !$this->isResolving();
-    }
-
-    /**
-     * @return bool
-     */
-    public function isInitializing(): bool
-    {
-        return $this->initializing;
-    }
-
-    public function isResolving(): bool
-    {
-        return $this->resolving;
-    }
-
-    public function clearModifiedAttributeFlags()
-    {
-        $this->modifiedAttributes = [];
-    }
-
-    /**
-     * @return mixed[]
-     */
-    public function getModifiedAttributeNames(): array
-    {
-        return $this->modifiedAttributes;
-    }
-
-    /**
-     * @return mixed[]
-     */
-    public function getModifiedAttributes(): array
-    {
-        return array_only($this->toArray(), $this->modifiedAttributes);
-    }
-
-    /**
-     * Get items as an array of scalar values
-     *
-     * @return array
-     */
-    public function toScalarArray()
-    {
-        return simple_value($this->toArray());
-    }
-
-    /**
-     * @return \Sayla\Objects\AttributableObject
-     */
-    public function toVisibleObject()
-    {
-        return AttributableObject::make($this->toVisibleArray());
-    }
-
-    /**
-     * @return array
-     */
-    public function toVisibleArray(): array
-    {
-        return array_only($this->toArray(), $this->descriptor()->getVisible());
-    }
-
-    /**
-     * Get visible items as an array of scalar values
-     *
-     * @return array
-     */
-    public function toVisibleScalarArray()
-    {
-        return simple_value($this->toVisibleArray());
+        return $value;
     }
 }

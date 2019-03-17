@@ -3,20 +3,19 @@
 namespace Sayla\Objects\DataType;
 
 
+use Illuminate\Contracts\Support\Arrayable;
+use Illuminate\Pipeline\Pipeline;
 use Sayla\Objects\Attribute\Attribute;
 use Sayla\Objects\Attribute\AttributeFactory;
-use Sayla\Objects\Attribute\Property\AccessPropertyType;
-use Sayla\Objects\Attribute\Property\DefaultPropertyType;
+use Sayla\Objects\Attribute\Property\MapDescriptorMixin;
 use Sayla\Objects\Attribute\Property\MapPropertyType;
-use Sayla\Objects\Attribute\Property\ResolverPropertyType;
-use Sayla\Objects\Attribute\Property\VisibilityPropertyType;
 use Sayla\Objects\Attribute\PropertyTypeSet;
+use Sayla\Objects\Contract\ProvidesDataExtraction;
+use Sayla\Objects\Contract\ProvidesDataHydration;
 use Sayla\Objects\Contract\ProvidesDataTypeDescriptorMixin;
 use Sayla\Objects\DataObject;
 use Sayla\Objects\Exception\HydrationError;
-use Sayla\Objects\ObjectCollection;
 use Sayla\Objects\ObjectDispatcher;
-use Sayla\Objects\Transformers\Transformer;
 use Sayla\Util\Mixin\MixinSet;
 
 abstract class BaseDataType implements \Sayla\Objects\Contract\DataType
@@ -25,8 +24,8 @@ abstract class BaseDataType implements \Sayla\Objects\Contract\DataType
     protected $attributeDefinitions;
     /** @var AttributeFactory */
     protected $attributeDescriptors;
-    /** @var ObjectDispatcher */
-    protected $dispatcher;
+    /** @var string */
+    protected $eventDispatcher;
     /**
      * @var string
      */
@@ -35,10 +34,30 @@ abstract class BaseDataType implements \Sayla\Objects\Contract\DataType
      * @var string
      */
     protected $objectClass;
+    /** @var PropertyTypeSet|\Sayla\Objects\Contract\PropertyType[] */
     protected $propertyTypes;
     /** @var \Sayla\Objects\Transformers\ValueTransformerFactory */
     protected $valueFactory;
     private $descriptor;
+    private $hydrationPipeline;
+
+    /**
+     * @param $data
+     * @return array
+     */
+    public static function convertDataToArray($data): array
+    {
+        if (is_object($data) && method_exists($data, 'getArrayCopy')) {
+            $data = $data->getArrayCopy();
+        } elseif (is_object($data) && method_exists($data, 'getAttributes')) {
+            $data = $data->getAttributes();
+        } elseif ($data instanceof Arrayable) {
+            $data = $data->toArray();
+        } else {
+            $data = (array)$data;
+        }
+        return $data;
+    }
 
     /**
      * @param $object
@@ -47,17 +66,11 @@ abstract class BaseDataType implements \Sayla\Objects\Contract\DataType
      */
     public function extract($object): array
     {
-        $transformer = $this->getTransformer();
-        $mapping = $this->getDefinedProperties(MapPropertyType::getHandle());
-        $mappedData = [];
-        foreach ($object as $k => $v) {
-            $property = $mapping[$k];
-            if ($property === null || $property['to'] == false) {
-                continue;
-            }
-            array_set($mappedData, $property['to'], $transformer->smash($property['attribute'], $v));
-        }
-        return $mappedData;
+        $data = self::convertDataToArray($object);
+        /** @var \Sayla\Objects\DataType\AttributesContext $finalContext */
+        $finalContext = $this->getExtractionPipeline($data)->thenReturn();
+        $extractedData = $finalContext->attributes;
+        return $extractedData;
     }
 
     /**
@@ -66,15 +79,13 @@ abstract class BaseDataType implements \Sayla\Objects\Contract\DataType
      */
     public function extractData($object): array
     {
-        $mapping = $this->getDefinedProperties(MapPropertyType::getHandle());
-        $mappedData = [];
-        foreach ($mapping as $property) {
-            if ($property === null || $property['to'] == false) {
-                continue;
-            }
-            array_set($mappedData, $property['to'], data_get($object, $property['attribute']));
+        /** @var \Sayla\Objects\Attribute\Property\MapDescriptorMixin $mapMixin */
+        $descriptor = $this->getDescriptor();
+        if (!$descriptor->hasMixin(MapDescriptorMixin::class)) {
+            return self::convertDataToArray($object);
         }
-        return $mappedData;
+        $mapMixin = $descriptor->getMixin(MapPropertyType::getHandle());
+        return $mapMixin->extract($object);
     }
 
     /**
@@ -119,6 +130,9 @@ abstract class BaseDataType implements \Sayla\Objects\Contract\DataType
             ->filter();
     }
 
+    /**
+     * @return \Sayla\Objects\DataType\DataTypeDescriptor|\Sayla\Objects\Attribute\DefaultPropertyMixinSet
+     */
     public function getDescriptor(): DataTypeDescriptor
     {
         return $this->descriptor ?? ($this->descriptor = $this->makeDataTypeDescriptor());
@@ -133,16 +147,6 @@ abstract class BaseDataType implements \Sayla\Objects\Contract\DataType
     }
 
     /**
-     * @param \Sayla\Objects\DataObject|array $object
-     * @return array
-     */
-    protected function getNonResolvableAttributes($object): array
-    {
-        $array = is_array($object) ? $object : $object->toArray();
-        return array_except($array, $this->getDescriptor()->getResolvable());
-    }
-
-    /**
      * @return string
      */
     public function getObjectClass(): string
@@ -152,7 +156,8 @@ abstract class BaseDataType implements \Sayla\Objects\Contract\DataType
 
     public function getObjectDispatcher(): ObjectDispatcher
     {
-        return $this->dispatcher;
+        return $this->getDescriptor()->dispatcher();
+
     }
 
     /**
@@ -164,28 +169,6 @@ abstract class BaseDataType implements \Sayla\Objects\Contract\DataType
         return $this->getAttributeDescriptors()->getAttributes()
             ->map->filterByPropertyType($propertyType)
             ->map->getFirst();
-    }
-
-    /**
-     * @return array|\Sayla\Objects\Attribute\DefaultPropertyTypeSet
-     */
-    public function getPropertySet(): PropertyTypeSet
-    {
-        return new PropertyTypeSet($this->propertyTypes->toArray());
-    }
-
-    /**
-     * @return \Sayla\Objects\Transformers\Transformer
-     */
-    public function getTransformer(): \Sayla\Objects\Transformers\Transformer
-    {
-        $transformations = $this->getDefinedProperties('transform');
-        $transformations = array_except($transformations, $this->getDescriptor()->getResolvable());
-        $transformer = new Transformer($transformations->map->getValue());
-        if (isset($this->valueFactory)) {
-            $transformer->setFactory($this->valueFactory);
-        }
-        return $transformer;
     }
 
     /**
@@ -201,27 +184,15 @@ abstract class BaseDataType implements \Sayla\Objects\Contract\DataType
     }
 
     /**
-     * @param iterable $data
      * @return array|mixed
      * @throws \Sayla\Exception\Error
      */
-    public function hydrateData($data)
+    public function hydrateData(array $data): array
     {
-        $mapping = $this->getDefinedProperties(MapPropertyType::getHandle());
-        $mappedData = [];
-        foreach ($mapping as $property) {
-            if ($property === null) {
-                $mappedData[$property['attribute']] = data_get($data, $property['attribute']);
-            }
-            if ($property['from']) {
-                $value = data_get($data, $property['from']);
-                $mappedData[$property['attribute']] = $value;
-                continue;
-            }
-        }
-        $mappedData = array_merge($this->getDescriptor()->getDefaultValues(), $mappedData);
-        $attributes = array_filter($mappedData);
-        return $this->getTransformer()->skipNonAttributes()->buildAll($attributes);
+        /** @var \Sayla\Objects\DataType\AttributesContext $finalContext */
+        $finalContext = $this->getHydrationPipeline($data)->thenReturn();
+        $hydratedData = $finalContext->attributes;
+        return $hydratedData;
     }
 
     /**
@@ -232,7 +203,7 @@ abstract class BaseDataType implements \Sayla\Objects\Contract\DataType
      */
     public function hydrateMany(iterable $results)
     {
-        $objectCollection = $this->newCollection();
+        $objectCollection = $this->getDescriptor()->newCollection();
         foreach ($results as $i => $result) {
             $objectCollection[$i] = $this->hydrate($result);
         }
@@ -250,12 +221,8 @@ abstract class BaseDataType implements \Sayla\Objects\Contract\DataType
     {
         try {
             $object->setDataType($this->name);
-            if (is_iterable($data)) {
-                $transformedData = $this->hydrateData($data);
-            } else {
-                $transformedData = $this->hydrateData((array)$data);
-            }
-            $object->init($transformedData);
+            $data = self::convertDataToArray($data);
+            $object->init($this->hydrateData($data));
         } catch (\Throwable $exception) {
             throw new HydrationError($this->name . ' - ' . $exception->getMessage(), $exception);
         }
@@ -265,29 +232,71 @@ abstract class BaseDataType implements \Sayla\Objects\Contract\DataType
     protected function makeDataTypeDescriptor(): DataTypeDescriptor
     {
         $names = $this->getAttributeNames();
-        $dataTypeDescriptor = new DataTypeDescriptor(
-            $this->getObjectDispatcher(),
-            $this->getName(),
-            $this->getObjectClass(),
-            $this->getDefinedProperties(ResolverPropertyType::getHandle()),
-            collect(array_combine($names, $names)),
-            $this->getProperties(AccessPropertyType::getHandle()),
-            $this->getProperties(VisibilityPropertyType::getHandle()),
-            $this->getDefinedProperties(DefaultPropertyType::getHandle()),
-            null
-        );
         $mixins = new MixinSet();
-        foreach ($this->getPropertySet() as $propertyType) {
+        foreach ($this->propertyTypes as $propertyType) {
             if ($propertyType instanceof ProvidesDataTypeDescriptorMixin) {
-                $mixins[$propertyType->getName()] = $propertyType->getDataTypeDescriptorMixin($this);
+                $mixins[$propertyType->getName()] = $propertyType
+                    ->getDataTypeDescriptorMixin(
+                        $this->name,
+                        $this->getProperties($propertyType->getName())->all()
+                    );
             }
         }
-        $dataTypeDescriptor->setMixins($mixins);
-        return $dataTypeDescriptor;
+        $descriptor = new DataTypeDescriptor($this->getName(), $this->getObjectClass(), $names, $mixins);
+        if ($this->eventDispatcher) {
+            $descriptor->setEventDispatcher(\Illuminate\Container\Container::getInstance()
+                ->make($this->eventDispatcher));
+        }
+        return $descriptor;
     }
 
-    public function newCollection()
+    /**
+     * @return \Sayla\Objects\Attribute\PropertyTypeSet|\Sayla\Objects\Contract\PropertyType[]
+     */
+    public function getPropertySet(): PropertyTypeSet
     {
-        return ObjectCollection::makeObjectCollection($this->name);
+        return new PropertyTypeSet($this->propertyTypes->toArray());
+    }
+
+    private function getExtractionPipeline(array $attributes = [])
+    {
+        if (!isset($this->hydrationPipeline)) {
+            $mapPipes = [];
+            $pipes = [];
+            foreach ($this->propertyTypes as $propertyType) {
+                if (!($propertyType instanceof ProvidesDataExtraction)) {
+                    continue;
+                }
+                if ($propertyType::getHandle() === MapPropertyType::getHandle()) {
+                    $mapPipes[] = $propertyType;
+                } else {
+                    $pipes[] = $propertyType;
+                }
+            }
+            $pipeline = new Pipeline();
+            $this->hydrationPipeline = $pipeline->through(array_merge($mapPipes, $pipes))->via('extract');
+        }
+        return $this->hydrationPipeline->send(new AttributesContext($this->getDescriptor(), $attributes));
+    }
+
+    private function getHydrationPipeline(array $attributes = [])
+    {
+        if (!isset($this->hydrationPipeline)) {
+            $mapPipes = [];
+            $pipes = [];
+            foreach ($this->propertyTypes as $propertyType) {
+                if (!($propertyType instanceof ProvidesDataHydration)) {
+                    continue;
+                }
+                if ($propertyType::getHandle() === MapPropertyType::getHandle()) {
+                    $mapPipes[] = $propertyType;
+                } else {
+                    $pipes[] = $propertyType;
+                }
+            }
+            $pipeline = new Pipeline();
+            $this->hydrationPipeline = $pipeline->through(array_merge($mapPipes, $pipes))->via('hydrate');
+        }
+        return $this->hydrationPipeline->send(new AttributesContext($this->getDescriptor(), $attributes));
     }
 }

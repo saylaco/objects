@@ -4,9 +4,12 @@ namespace Sayla\Objects;
 
 
 use Illuminate\Contracts\Events\Dispatcher;
+use Sayla\Objects\Contract\Serializes;
+use Sayla\Objects\Contract\SerializesTrait;
 
-class ObjectDispatcher
+class ObjectDispatcher implements Serializes
 {
+    use SerializesTrait;
     /** @var Dispatcher */
     private $dispatcher;
     /** @var string */
@@ -53,5 +56,13 @@ class ObjectDispatcher
     {
         $this->dispatcher->listen($this->qualifyEventName($event), $listener);
         return $this;
+    }
+
+    /**
+     * @return iterable|string[]|callable[]
+     */
+    public static function unserializableInstanceProperties(): iterable
+    {
+        return ['dispatcher'];
     }
 }

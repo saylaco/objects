@@ -51,6 +51,9 @@ interface DataType
      */
     public function getDefinedProperties(string $propertyType);
 
+    /**
+     * @return \Sayla\Objects\DataType\DataTypeDescriptor|\Sayla\Objects\Attribute\DefaultPropertyMixinSet
+     */
     public function getDescriptor(): DataTypeDescriptor;
 
     /**
@@ -63,6 +66,9 @@ interface DataType
      */
     public function getObjectClass(): string;
 
+    /**
+     * @return \Sayla\Objects\ObjectDispatcher
+     */
     public function getObjectDispatcher(): ObjectDispatcher;
 
     /**
@@ -77,11 +83,6 @@ interface DataType
     public function getPropertySet(): PropertyTypeSet;
 
     /**
-     * @return \Sayla\Objects\Transformers\Transformer
-     */
-    public function getTransformer(): \Sayla\Objects\Transformers\Transformer;
-
-    /**
      * Hydrate $object with the provided $data.
      *
      * @param iterable $data
@@ -91,11 +92,11 @@ interface DataType
     public function hydrate($data);
 
     /**
-     * @param  $data
-     * @return array|mixed
+     * @param  array $data
+     * @return array
      * @throws \Sayla\Exception\Error
      */
-    public function hydrateData($data);
+    public function hydrateData(array $data): array;
 
     /**
      * @param string $class
@@ -113,9 +114,4 @@ interface DataType
      * @throws \Sayla\Objects\Exception\HydrationError
      */
     public function hydrateObject(DataObject $object, $data);
-
-    /**
-     * @return \Sayla\Objects\ObjectCollection
-     */
-    public function newCollection();
 }

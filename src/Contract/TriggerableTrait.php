@@ -68,7 +68,7 @@ trait TriggerableTrait
         if (method_exists($instance, $triggerMethod)) {
             $instance::$triggerMethod($instance);
         }
-        $this->descriptor()->getEventDispatcher()->fire($triggerName, [$this]);
+        $this->descriptor()->dispatcher()->fire($triggerName, [$this]);
     }
 
     /**

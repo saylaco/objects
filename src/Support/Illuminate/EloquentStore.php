@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Sayla\Objects\Contract\ConfigurableStore;
 use Sayla\Objects\Contract\ObjectStore;
 use Sayla\Objects\DataModel;
+use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 
@@ -15,21 +16,24 @@ class EloquentStore implements ObjectStore, ConfigurableStore
     protected $useTransactions = false;
     /** @var Model */
     protected $model;
-    
-    public static function defineOptions(OptionsResolver $resolver): void {
+
+    public static function defineOptions(OptionsResolver $resolver): void
+    {
         $resolver->setRequired('model');
         $resolver->setAllowedTypes('model', ['string', \Illuminate\Database\Eloquent\Model::class]);
         $resolver->setDefault('useTransactions', false);
         $resolver->setAllowedTypes('useTransactions', 'boolean');
-        $resolver->setNormalizer('model', function($model): \Illuminate\Database\Eloquent\Model{
-            if (is_string($model))
+        $resolver->setNormalizer('model', function (Options $options, $model): \Illuminate\Database\Eloquent\Model {
+            if (is_string($model)) {
                 return Container::getInstance()->make($model);
+            }
             return $model;
         });
     }
 
-    public function setOptions(string $name, array $options): void {
-        $this->model = $options['model'] ??  $name;
+    public function setOptions(string $name, array $options): void
+    {
+        $this->model = $options['model'] ?? $name;
         $this->useTransactions = $options['useTransactions'];
     }
 
@@ -84,16 +88,16 @@ class EloquentStore implements ObjectStore, ConfigurableStore
     }
 
     /**
-     * @param Model $model
-     * @return Model
+     * @param \Sayla\Objects\DataModel $object
+     * @return array|mixed
+     * @throws \Sayla\Exception\Error
      */
-    protected function createModel($object)
+    protected function createModel(DataModel $object)
     {
-        $dataType = $object->dataType();
-        $data = $dataType->extractMappable($object);
+        $data = $object->datatype()->extractData($object);
         $model = $this->model->newInstance($data);
         $model->save();
-        return $dataType->hydrateData($model->getAttributes());
+        return $model->getAttributes();
     }
 
     /**
@@ -113,7 +117,7 @@ class EloquentStore implements ObjectStore, ConfigurableStore
     protected function deleteModel($model, $object)
     {
         $model->delete();
-        return $object->dataType()->hydrateData($model->getAttributes());
+        return $model->getAttributes();
     }
 
     /**
@@ -123,11 +127,10 @@ class EloquentStore implements ObjectStore, ConfigurableStore
      */
     protected function updateModel($model, $object)
     {
-        $dataType = $object->dataType();
-        $data = $dataType->extractData($object);
+        $data = $object->datatype()->extractData($object);
         $model->fill($data);
         $model->save();
-        return $dataType->hydrateData($model->getAttributes());
+        return $model->getAttributes();
     }
 
     /**
@@ -146,5 +149,13 @@ class EloquentStore implements ObjectStore, ConfigurableStore
     public function usesTransactions(): bool
     {
         return $this->useTransactions;
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Model
+     */
+    public function getModel(): \Illuminate\Database\Eloquent\Model
+    {
+        return $this->model;
     }
 }

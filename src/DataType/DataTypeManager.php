@@ -6,24 +6,25 @@ namespace Sayla\Objects\DataType;
 use Illuminate\Contracts\Support\Arrayable;
 use Sayla\Objects\Builder\Builder;
 use Sayla\Objects\Contract\DataType;
-use Sayla\Objects\DataObject;
 
 class DataTypeManager implements \IteratorAggregate, Arrayable
 {
-    private static $builders = [];
+    private static $dataTypeClasses = [];
     private static $instance;
+    /** @var callable */
+    protected $builderResolver;
     private $aliases = [];
     /** @var \Sayla\Objects\Contract\DataType[] */
     private $dataTypes = [];
 
-    public static function addBuilderExtension(string $builderName, callable $callback)
+    public static function addDataType(string $name, string $class)
     {
-        self::$builders[$builderName] = $callback;
+        self::$dataTypeClasses[$name] = $class;
     }
 
-    private static function getBuilderExtension(string $builderName): callable
+    private static function getDataTypeClass(string $name): string
     {
-        return self::$builders[$builderName];
+        return self::$dataTypeClasses[$name];
     }
 
     public static function getInstance(): self
@@ -38,15 +39,12 @@ class DataTypeManager implements \IteratorAggregate, Arrayable
 
     public function __call(string $builderName, array $builderArgs): Builder
     {
-        if (!starts_with($builderName, 'add')) {
+        if (!starts_with($builderName, 'build')) {
             throw new \BadMethodCallException(self::class . '::' . $builderName);
         }
-        $builderName = lcfirst(str_after($builderName, 'add'));
-        $builderExtension = self::getBuilderExtension($builderName);
+        $builderName = lcfirst(str_after($builderName, 'build'));
+        $builderExtension = self::getDataTypeClass($builderName);
         $builder = call_user_func_array($builderExtension, $builderArgs);
-        $builder->onPostBuild(function (DataType $dataType) {
-            $this->add($dataType);
-        });
         return $builder;
     }
 
@@ -62,19 +60,27 @@ class DataTypeManager implements \IteratorAggregate, Arrayable
         return $this;
     }
 
+
     public function get(string $name): DataType
     {
-        if (!$this->has($name) && is_subclass_of($name, DataObject::class)) {
+        $name = $this->aliases[$name] ?? $name;
+
+        if (!$this->has($name)) {
             $this->dataTypes[$name] = $this->getBuilder($name)->build();
         }
-        $name = $this->aliases[$name] ?? $name;
 
         return $this->dataTypes[$name];
     }
 
     public function getBuilder(string $objectClass): Builder
     {
-        return new Builder($objectClass);
+        $builder = new Builder($objectClass);
+
+        if ($this->builderResolver) {
+            call_user_func($this->builderResolver, $builder, $objectClass);
+        }
+
+        return $builder;
     }
 
     public function getDescriptor(string $name): DataTypeDescriptor
@@ -93,6 +99,16 @@ class DataTypeManager implements \IteratorAggregate, Arrayable
     public function has(string $name): bool
     {
         return isset($this->dataTypes[$name]) || isset($this->aliases[$name]);
+    }
+
+    /**
+     * @param callable $callback
+     * @return $this
+     */
+    public function setBuilderResolver(callable $callback)
+    {
+        $this->builderResolver = $callback;
+        return $this;
     }
 
     /**

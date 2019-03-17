@@ -2,14 +2,20 @@
 
 namespace Sayla\Objects\Attribute\Property;
 
-use Sayla\Objects\Contract\DataType;
 use Sayla\Objects\Contract\PropertyType;
+use Sayla\Objects\Contract\ProvidesDataExtraction;
+use Sayla\Objects\Contract\ProvidesDataHydration;
 use Sayla\Objects\Contract\ProvidesDataTypeDescriptorMixin;
 use Sayla\Util\Mixin\Mixin;
 
-class MapPropertyType implements PropertyType, ProvidesDataTypeDescriptorMixin
+class MapPropertyType implements PropertyType, ProvidesDataTypeDescriptorMixin, ProvidesDataHydration, ProvidesDataExtraction
 {
     private $autoMapping = false;
+
+    public static function getHandle(): string
+    {
+        return 'map';
+    }
 
     public function disableAutoMapping()
     {
@@ -23,31 +29,9 @@ class MapPropertyType implements PropertyType, ProvidesDataTypeDescriptorMixin
         return $this;
     }
 
-    public function getDataTypeDescriptorMixin(DataType $dataType): Mixin
+    public function getDataTypeDescriptorMixin(string $dataType, array $properties): Mixin
     {
-        return new class($dataType) implements Mixin
-        {
-            private $mappable;
-
-            public function __construct(DataType $dataType)
-            {
-                $mappable = $dataType->getDefinedProperties(MapPropertyType::getHandle());
-                $this->mappable = $mappable;
-            }
-
-            public function isMappable($attributeName)
-            {
-                return $this->mappable->has($attributeName);
-            }
-
-            /**
-             * @return array
-             */
-            public function getMappable(): array
-            {
-                return $this->mappable->keys()->sort()->all();
-            }
-        };
+        return new MapDescriptorMixin($properties);
     }
 
     /**
@@ -56,11 +40,6 @@ class MapPropertyType implements PropertyType, ProvidesDataTypeDescriptorMixin
     public function getDefinitionKeys(): array
     {
         return ['mapFrom', 'mapTo', 'map'];
-    }
-
-    public static function getHandle(): string
-    {
-        return 'map';
     }
 
     public function getName(): string
@@ -105,5 +84,27 @@ class MapPropertyType implements PropertyType, ProvidesDataTypeDescriptorMixin
         }
 
         return $map;
+    }
+
+    /**
+     * @param \Sayla\Objects\DataType\AttributesContext $context
+     * @param callable $next
+     * @return \Sayla\Objects\DataType\AttributesContext
+     */
+    public function hydrate($context, callable $next)
+    {
+        $context->attributes = $context->descriptor->hydrate($context->attributes);
+        return $next($context);
+    }
+
+    /**
+     * @param \Sayla\Objects\DataType\AttributesContext $context
+     * @param callable $next
+     * @return \Sayla\Objects\DataType\AttributesContext
+     */
+    public function extract($context, callable $next)
+    {
+        $context->attributes = $context->descriptor->extract($context->attributes);
+        return $next($context);
     }
 }

@@ -6,5 +6,5 @@ use Sayla\Util\Mixin\Mixin;
 
 interface ProvidesDataTypeDescriptorMixin
 {
-    public function getDataTypeDescriptorMixin(DataType $dataType): Mixin;
+    public function getDataTypeDescriptorMixin(string $dataType, array $properties): Mixin;
 }
