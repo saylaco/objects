@@ -3,11 +3,12 @@
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Contracts\Support\Jsonable;
 use Sayla\Data\DotArrayObject;
+use Sayla\Objects\Transformers\AttributeValueTransformer;
 use Sayla\Objects\Transformers\ValueTransformer;
 use Sayla\Objects\Transformers\ValueTransformerTrait;
 use Sayla\Util\JsonHelper;
 
-class ArrayObjectTransformer implements ValueTransformer
+class ArrayObjectTransformer implements ValueTransformer, AttributeValueTransformer
 {
     use ValueTransformerTrait;
 
@@ -28,9 +29,19 @@ class ArrayObjectTransformer implements ValueTransformer
         return $value;
     }
 
+    public function getArrayableClass(): string
+    {
+        return $this->options->get('class', DotArrayObject::class);
+    }
+
     public function getScalarType(): ?string
     {
         return 'array';
+    }
+
+    public function getVarType(): string
+    {
+        return $this->getArrayableClass();
     }
 
     /**
@@ -49,10 +60,5 @@ class ArrayObjectTransformer implements ValueTransformer
             return [];
         }
         return $value;
-    }
-
-    public function getArrayableClass(): string
-    {
-        return $this->options->get('class', DotArrayObject::class);
     }
 }

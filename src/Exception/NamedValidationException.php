@@ -3,8 +3,9 @@
 namespace Sayla\Objects\Exception;
 
 use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Validation\ValidationException;
 
-class NamedValidationException extends \Illuminate\Validation\ValidationException
+class NamedValidationException extends ValidationException
 {
     public $entityName;
 

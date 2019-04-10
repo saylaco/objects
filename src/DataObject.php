@@ -2,23 +2,25 @@
 
 namespace Sayla\Objects;
 
-use Sayla\Objects\Contract\Attributable;
+use Sayla\Objects\Contract\IDataObject;
 use Sayla\Objects\Contract\NonCachableAttribute;
-use Sayla\Objects\Contract\SupportsDataType;
 use Sayla\Objects\Contract\SupportsDataTypeManager;
-use Sayla\Objects\Contract\SupportsObjectDescriptorTrait;
+use Sayla\Objects\Contract\SupportsDataTypeManagerTrait;
 use Sayla\Objects\Contract\Triggerable;
 use Sayla\Objects\Contract\TriggerableTrait;
+use Sayla\Objects\DataType\DataType;
+use Sayla\Objects\DataType\DataTypeDescriptor;
 use Sayla\Objects\Exception\InaccessibleAttribute;
 
-class DataObject extends AttributableObject
-    implements \Serializable, Attributable, SupportsDataType, SupportsDataTypeManager, Triggerable
+abstract class DataObject extends AttributableObject implements IDataObject, SupportsDataTypeManager, Triggerable
 {
-    use SupportsObjectDescriptorTrait;
+    use SupportsDataTypeManagerTrait;
     use TriggerableTrait;
+
+    protected const DATA_TYPE = null;
     const TRIGGER_PREFIX = '__';
     protected static $unguarded = false;
-    protected const DATA_TYPE = null;
+
     private $initializing = false;
     private $modifiedAttributes = [];
     private $resolving = false;
@@ -34,9 +36,24 @@ class DataObject extends AttributableObject
         }
     }
 
+    final static public function dataType(): DataType
+    {
+        return self::getDataTypeManager()->get(static::dataTypeName());
+    }
+
+    public static function dataTypeName(): string
+    {
+        return static::DATA_TYPE ?? static::class;
+    }
+
+    final static public function descriptor(): DataTypeDescriptor
+    {
+        return self::getDataTypeManager()->getDescriptor(static::dataTypeName());
+    }
+
     public static function newObjectCollection()
     {
-        return static::getDescriptor()->newCollection();
+        return static::descriptor()->newCollection();
     }
 
     /**
@@ -52,7 +69,7 @@ class DataObject extends AttributableObject
     /**
      * Disable all mass assignable restrictions.
      *
-     * @param  bool $state
+     * @param bool $state
      * @return void
      */
     public static function unguard($state = true)
@@ -99,7 +116,7 @@ class DataObject extends AttributableObject
         $this->offsetUnset($name);
     }
 
-    public function clearModifiedAttributeFlags()
+    public function clearModifiedAttributeFlags(): void
     {
         $this->modifiedAttributes = [];
     }
@@ -120,7 +137,7 @@ class DataObject extends AttributableObject
     protected function getGuardedAttributeValue(string $attributeName)
     {
         if (!$this->isRetrievableAttribute($attributeName)) {
-            throw new InaccessibleAttribute(static::getDefinedDataType(), $attributeName, 'Not readable');
+            throw new InaccessibleAttribute(static::dataTypeName(), $attributeName, 'Not readable');
         }
         return $this->getAttributeValue($attributeName);
     }
@@ -143,7 +160,7 @@ class DataObject extends AttributableObject
 
     /**
      * @param iterable $attributes
-     * @return \Sayla\Objects\DataObject
+     * @return $this
      */
     final public function init(iterable $attributes): self
     {
@@ -308,7 +325,7 @@ class DataObject extends AttributableObject
     protected function setGuardedAttributeValue(string $attributeName, $value)
     {
         if (!$this->isAttributeWritable($attributeName)) {
-            throw new InaccessibleAttribute(static::getDefinedDataType(), $attributeName, 'Not writable');
+            throw new InaccessibleAttribute(static::dataTypeName(), $attributeName, 'Not writable');
         }
         $this->setAttributeValue($attributeName, $value);
     }

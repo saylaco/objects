@@ -4,7 +4,6 @@ namespace Sayla\Objects\Contract;
 
 interface PropertyType
 {
-    public static function getHandle(): string;
 
     /**
      * @return string[]|null

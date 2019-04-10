@@ -2,25 +2,38 @@
 
 namespace Sayla\Objects\Attribute;
 
-use Sayla\Objects\Attribute\Property\PropertySet;
 use Sayla\Objects\Contract\Property;
 
 class Attribute extends PropertySet
 {
+    /** @var string */
+    private $typeHandle;
+
+    /**
+     * Property constructor.
+     * @param mixed $value
+     * @param string $typeHandle
+     * @param string $name
+     */
+    public function __construct(string $typeHandle, string $name, array $value)
+    {
+        $this->typeHandle = $typeHandle;
+        parent::__construct($name, $value);
+    }
 
     /**
      * @param string $propertyType
      * @return \Sayla\Objects\Attribute\Attribute
      */
-    public function filterByPropertyType(string $propertyType)
+    public function filterByProperty(string $propertyName)
     {
         $properties = [];
-        foreach ($this as $property) {
-            if ($property->getTypeHandle() == $propertyType) {
+        foreach ($this->getValue() as $property) {
+            if ($property->getName() == $propertyName) {
                 $properties[] = $property;
             }
         }
-        return new Attribute($this->getTypeHandle(), $this->getName(), $properties);
+        return new Attribute($this->typeHandle, $this->getName(), $properties);
     }
 
     public function getFirst(): ?Property
@@ -29,17 +42,22 @@ class Attribute extends PropertySet
     }
 
     /**
-     * @return \Sayla\Objects\Attribute\Property\Property[]
+     * @return \Sayla\Objects\Attribute\Property[]
      */
     public function getIterator()
     {
         return parent::getIterator();
     }
 
-    public function hasPropertyOfType(string $propertyType)
+    public function getTypeHandle(): string
+    {
+        return $this->typeHandle;
+    }
+
+    public function hasProperty(string $propertyType)
     {
         foreach ($this as $property) {
-            if ($property->getTypeHandle() == $propertyType) {
+            if ($property->getName() == $propertyType) {
                 return true;
             }
         }

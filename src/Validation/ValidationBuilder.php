@@ -12,20 +12,20 @@ class ValidationBuilder
 {
     /** @var  \Illuminate\Contracts\Validation\Factory */
     protected static $sharedValidationFactory;
-    /** @var  \Illuminate\Contracts\Validation\Factory */
-    protected $validationFactory;
-    /** @var string */
-    protected $entityName;
-    /** @var \Sayla\Data\ArrayObject */
-    protected $properties;
-    /** @var string[] */
-    protected $messages = [];
     /** @var string[] */
     protected $customAttributes = [];
+    /** @var string */
+    protected $entityName;
+    /** @var string[] */
+    protected $messages = [];
+    /** @var \Sayla\Data\ArrayObject */
+    protected $properties;
     /** @var string[]|mixed[] */
     protected $rules = [];
     /** @var bool */
     protected $useDataAsProperties = true;
+    /** @var  \Illuminate\Contracts\Validation\Factory */
+    protected $validationFactory;
 
     /**
      * RulesParser constructor.
@@ -44,6 +44,132 @@ class ValidationBuilder
     public static function setSharedValidationFactory(Factory $validator)
     {
         self::$sharedValidationFactory = $validator;
+    }
+
+    /**
+     * @param array $data
+     * @param array|iterable $rules
+     * @param array|null $messages
+     * @param array|null $customAttributes
+     * @return \Illuminate\Validation\Validator
+     */
+    public function build(array $data = [],
+                          array $rules = null,
+                          array $messages = null,
+                          array $customAttributes = null): IlluminateValidator
+    {
+        $rules = $this->mergeRules($rules);
+        if ($this->useDataAsProperties) {
+            $preparedRules = $this->prepareRules($rules, $data);
+        } else {
+            $preparedRules = $this->prepareRules($rules);
+        }
+        $messages = $this->mergeMessages($messages);
+        $customAttributes = $this->mergeCustomAttributes($customAttributes);
+        $validator = $this->getFactory()->make($data, $preparedRules, $messages, $customAttributes);
+        return $validator;
+    }
+
+    /**
+     * @return \Illuminate\Contracts\Validation\Factory
+     */
+    public function getFactory(): Factory
+    {
+        return $this->validationFactory ?? self::$sharedValidationFactory;
+    }
+
+    /**
+     * @param array $customAttributes
+     * @return array
+     */
+    public function mergeCustomAttributes(array $customAttributes = null): array
+    {
+        if (empty($customAttributes)) {
+            $customAttributes = $this->customAttributes;
+        } else {
+            $customAttributes = array_replace_recursive($this->customAttributes, $customAttributes);
+        }
+        return $customAttributes;
+    }
+
+    /**
+     * @param array $messages
+     * @return array
+     */
+    public function mergeMessages(array $messages = null): array
+    {
+        if (empty($messages)) {
+            $messages = $this->messages;
+        } else {
+            $messages = array_replace_recursive($this->messages, $messages);
+        }
+        return $messages;
+    }
+
+    /**
+     * @param array $rules
+     * @return array
+     */
+    public function mergeRules(array $rules = null): array
+    {
+        if (empty($rules)) {
+            $rules = $this->rules;
+        } else {
+            $rules = array_replace_recursive($this->rules, $rules);
+        }
+        return $rules;
+    }
+
+    /**
+     * @param iterable $allRules
+     * @param array|null $extraProperties
+     * @return iterable
+     */
+    public function prepareRules(iterable $allRules, array $extraProperties = null)
+    {
+        $properties = $this->properties;
+        if ($extraProperties) {
+            $properties = new ArrayObject(array_merge($properties->toArray(), $extraProperties));
+        }
+        if (count($properties) == 0) {
+            return $allRules;
+        }
+        foreach ($allRules as $attr => $rules) {
+            if (!is_array($rules)) {
+                $rules = explode('|', $rules);
+            }
+            $toAppend = [];
+            foreach ($rules as $i => $rule) {
+                if (!is_string($rule)) {
+                    $toAppend[] = $rule;
+                } elseif (preg_match_all('/(null|Null|NULL)$|\$([\.\w]+)/', $rule, $matches, PREG_SET_ORDER)) {
+                    $replace = [];
+                    $search = [];
+                    foreach ($matches as $match) {
+                        $search[] = $match[0];
+                        switch ($match[2]) {
+                            case 'null':
+                            case 'Null':
+                            case 'NULL':
+                                $value = null;
+                                break;
+                            case $match[2] == '__value':
+                                $value = array_get($properties, $attr);
+                                break;
+                            default:
+                                $value = array_get($properties, $match[2]);
+                        }
+                        $replace[] = is_null($value) ? 'NULL' : $value;
+                    }
+                    $rules[$i] = str_replace($search, $replace, $rules[$i]);
+                }
+            }
+            if (!empty($toAppend)) {
+                $rules = array_merge($rules, $toAppend);
+            }
+            $allRules[$attr] = $rules;
+        }
+        return $allRules;
     }
 
     /**
@@ -114,131 +240,5 @@ class ValidationBuilder
             throw new NamedValidationException($validator, $this->entityName);
         }
         return $validator;
-    }
-
-    /**
-     * @param array $data
-     * @param array|iterable $rules
-     * @param array|null $messages
-     * @param array|null $customAttributes
-     * @return \Illuminate\Validation\Validator
-     */
-    public function build(array $data = [],
-                          array $rules = null,
-                          array $messages = null,
-                          array $customAttributes = null): IlluminateValidator
-    {
-        $rules = $this->mergeRules($rules);
-        if ($this->useDataAsProperties) {
-            $preparedRules = $this->prepareRules($rules, $data);
-        } else {
-            $preparedRules = $this->prepareRules($rules);
-        }
-        $messages = $this->mergeMessages($messages);
-        $customAttributes = $this->mergeCustomAttributes($customAttributes);
-        $validator = $this->getFactory()->make($data, $preparedRules, $messages, $customAttributes);
-        return $validator;
-    }
-
-    /**
-     * @param array $rules
-     * @return array
-     */
-    public function mergeRules(array $rules = null): array
-    {
-        if (empty($rules)) {
-            $rules = $this->rules;
-        } else {
-            $rules = array_replace_recursive($this->rules, $rules);
-        }
-        return $rules;
-    }
-
-    /**
-     * @param iterable $allRules
-     * @param array|null $extraProperties
-     * @return iterable
-     */
-    public function prepareRules(iterable $allRules, array $extraProperties = null)
-    {
-        $properties = $this->properties;
-        if ($extraProperties) {
-            $properties = new ArrayObject(array_merge($properties->toArray(), $extraProperties));
-        }
-        if (count($properties) == 0) {
-            return $allRules;
-        }
-        foreach ($allRules as $attr => $rules) {
-            if (!is_array($rules)) {
-                $rules = explode('|', $rules);
-            }
-            $toAppend = [];
-            foreach ($rules as $i => $rule) {
-                if (!is_string($rule)) {
-                    $toAppend[] = $rule;
-                } elseif (preg_match_all('/(null|Null|NULL)$|\$([\.\w]+)/', $rule, $matches, PREG_SET_ORDER)) {
-                    $replace = [];
-                    $search = [];
-                    foreach ($matches as $match) {
-                        $search[] = $match[0];
-                        switch ($match[2]) {
-                            case 'null':
-                            case 'Null':
-                            case 'NULL':
-                                $value = null;
-                                break;
-                            case $match[2] == '__value':
-                                $value = array_get($properties, $attr);
-                                break;
-                            default:
-                                $value = array_get($properties, $match[2]);
-                        }
-                        $replace[] = is_null($value) ? 'NULL' : $value;
-                    }
-                    $rules[$i] = str_replace($search, $replace, $rules[$i]);
-                }
-            }
-            if (!empty($toAppend)) {
-                $rules = array_merge($rules, $toAppend);
-            }
-            $allRules[$attr] = $rules;
-        }
-        return $allRules;
-    }
-
-    /**
-     * @param array $messages
-     * @return array
-     */
-    public function mergeMessages(array $messages = null): array
-    {
-        if (empty($messages)) {
-            $messages = $this->messages;
-        } else {
-            $messages = array_replace_recursive($this->messages, $messages);
-        }
-        return $messages;
-    }
-
-    /**
-     * @param array $customAttributes
-     * @return array
-     */
-    public function mergeCustomAttributes(array $customAttributes = null): array
-    {
-        if (empty($customAttributes)) {
-            $customAttributes = $this->customAttributes;
-        } else {
-            $customAttributes = array_replace_recursive($this->customAttributes, $customAttributes);
-        }
-        return $customAttributes;
-    }
-
-    /**
-     * @return \Illuminate\Contracts\Validation\Factory
-     */
-    public function getFactory(): Factory
-    {
-        return $this->validationFactory ?? self::$sharedValidationFactory;
     }
 }

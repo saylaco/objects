@@ -3,6 +3,7 @@
 namespace Sayla\Objects\Transformers;
 
 use GlobIterator;
+use Psr\Container\ContainerInterface;
 use Sayla\Exception\Error;
 use Sayla\Objects\Contract\Serializes;
 use Sayla\Objects\Contract\SerializesTrait;
@@ -11,9 +12,8 @@ use Sayla\Objects\Transformers\Transformer\DatetimeTransformer;
 class ValueTransformerFactory implements Serializes
 {
     use SerializesTrait;
+    public static $sharedTransformerClasses = [];
     private static $instance;
-    /** @var string[] */
-    private static $sharedTransformerClasses = [];
     /** @var \Psr\Container\ContainerInterface */
     protected $container;
     /** @var string[] */
@@ -22,6 +22,19 @@ class ValueTransformerFactory implements Serializes
     public function __construct(array $transformerClasses)
     {
         $this->transformerClasses = $transformerClasses;
+    }
+
+    /**
+     * @param string $valueTransformerClass
+     * @param string|null $typeName
+     * @throws \Sayla\Exception\Error
+     */
+    public static function forceShareType(string $valueTransformerClass, string $typeName, array $options = null)
+    {
+        self::$sharedTransformerClasses[$typeName] = [
+            'class' => $valueTransformerClass,
+            'options' => $options
+        ];
     }
 
     public static function getInstance(): ValueTransformerFactory
@@ -79,15 +92,15 @@ class ValueTransformerFactory implements Serializes
      * @param string|null $typeName
      * @throws \Sayla\Exception\Error
      */
-    public static function shareType(string $valueTransformerClass, string $typeName = null)
+    public static function shareType(string $valueTransformerClass, string $typeName, array $options = null)
     {
-        if (blank($typeName)) {
-            $typeName = lcfirst(class_basename($valueTransformerClass));
-        }
-        if (isset(self::$sharedTransformerClasses[$typeName])) {
+        if (self::isSharedType($typeName)) {
             throw new Error('Transformer type is already shared: ' . $typeName);
         }
-        self::$sharedTransformerClasses[$typeName] = $valueTransformerClass;
+        self::$sharedTransformerClasses[$typeName] = [
+            'class' => $valueTransformerClass,
+            'options' => $options
+        ];
     }
 
     /**
@@ -124,12 +137,17 @@ class ValueTransformerFactory implements Serializes
         } else {
             $valueTransformer = new $transformerClass();
         }
+
         if ($options) {
             if (!$options instanceof Options) {
                 $options = new Options($options);
             }
-            $valueTransformer->setOptions($options);
         }
+        if (self::isSharedType($type) && isset(self::$sharedTransformerClasses[$type]['options'])) {
+            foreach (self::$sharedTransformerClasses[$type]['options'] as $k => $v)
+                $options[$k] = $v;
+        }
+        $valueTransformer->setOptions($options);
         return $valueTransformer;
     }
 
@@ -144,7 +162,7 @@ class ValueTransformerFactory implements Serializes
             return $this->transformerClasses[$type];
         }
         if (self::isSharedType($type)) {
-            return self::$sharedTransformerClasses[$type];
+            return self::$sharedTransformerClasses[$type]['class'];
         }
         if (ends_with($type, 'Stamp')) {
             return DatetimeTransformer::class;
@@ -187,7 +205,7 @@ class ValueTransformerFactory implements Serializes
     /**
      * @param \Psr\Container\ContainerInterface $container
      */
-    public function setContainer(\Psr\Container\ContainerInterface $container): void
+    public function setContainer(ContainerInterface $container): void
     {
         $this->container = $container;
     }

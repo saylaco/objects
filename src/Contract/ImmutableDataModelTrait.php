@@ -2,7 +2,7 @@
 
 namespace Sayla\Objects\Contract;
 /**
- * @mixin \Sayla\Objects\DataModel
+ * @mixin \Sayla\Objects\StorableTrait
  */
 trait ImmutableDataModelTrait
 {

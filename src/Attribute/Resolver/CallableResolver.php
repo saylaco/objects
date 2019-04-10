@@ -2,6 +2,7 @@
 
 namespace Sayla\Objects\Attribute\Resolver;
 
+use Closure;
 use Sayla\Objects\Contract\AttributeResolver;
 use Sayla\Objects\Contract\AttributeResolverTrait;
 use Sayla\Objects\DataObject;
@@ -20,17 +21,6 @@ class CallableResolver implements AttributeResolver
     }
 
     /**
-     * @param callable $callable
-     * @return $this
-     */
-    public function setCallable($callable)
-    {
-        $this->callable = $callable;
-        $this->isClosure = $callable instanceof \Closure;
-        return $this;
-    }
-
-    /**
      * @param \Sayla\Objects\DataObject $owningObject
      * @return mixed
      */
@@ -46,5 +36,16 @@ class CallableResolver implements AttributeResolver
     public function resolveMany($objects): array
     {
         return $this->resolveManyUsingSingleResolver($objects);
+    }
+
+    /**
+     * @param callable $callable
+     * @return $this
+     */
+    public function setCallable($callable)
+    {
+        $this->callable = $callable;
+        $this->isClosure = $callable instanceof Closure;
+        return $this;
     }
 }

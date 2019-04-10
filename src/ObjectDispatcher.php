@@ -20,28 +20,24 @@ class ObjectDispatcher implements Serializes
      * @param \Illuminate\Contracts\Events\Dispatcher $dispatcher
      * @param string $name
      */
-    public function __construct(\Illuminate\Contracts\Events\Dispatcher $dispatcher, string $name)
+    public function __construct(Dispatcher $dispatcher, string $name)
     {
         $this->dispatcher = $dispatcher;
         $this->name = $name;
+    }
+
+    /**
+     * @return iterable|string[]|callable[]
+     */
+    public static function unserializableInstanceProperties(): iterable
+    {
+        return ['dispatcher'];
     }
 
     public function fire($event, $payload = [])
     {
         $this->dispatcher->dispatch($this->qualifyEventName($event), $payload);
         return $this;
-    }
-
-    /**
-     * @param $event
-     * @return string
-     */
-    public function qualifyEventName($event): string
-    {
-        if (is_object($event)) {
-            $event = get_class($event);
-        }
-        return "{$this->name}.{$event}";
     }
 
     /**
@@ -59,10 +55,14 @@ class ObjectDispatcher implements Serializes
     }
 
     /**
-     * @return iterable|string[]|callable[]
+     * @param $event
+     * @return string
      */
-    public static function unserializableInstanceProperties(): iterable
+    public function qualifyEventName($event): string
     {
-        return ['dispatcher'];
+        if (is_object($event)) {
+            $event = get_class($event);
+        }
+        return "{$this->name}.{$event}";
     }
 }

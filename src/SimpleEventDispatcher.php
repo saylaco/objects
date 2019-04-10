@@ -2,6 +2,7 @@
 
 namespace Sayla\Objects;
 
+use BadMethodCallException;
 use Illuminate\Contracts\Events\Dispatcher;
 
 class SimpleEventDispatcher implements Dispatcher
@@ -12,9 +13,9 @@ class SimpleEventDispatcher implements Dispatcher
     /**
      * Dispatch an event and call the listeners.
      *
-     * @param  string|object $event
-     * @param  mixed $payload
-     * @param  bool $halt
+     * @param string|object $event
+     * @param mixed $payload
+     * @param bool $halt
      * @return array|null
      */
     public function dispatch($event, $payload = [], $halt = false)
@@ -39,7 +40,7 @@ class SimpleEventDispatcher implements Dispatcher
     /**
      * Flush a set of pushed events.
      *
-     * @param  string $event
+     * @param string $event
      * @return void
      */
     public function flush($event)
@@ -56,7 +57,7 @@ class SimpleEventDispatcher implements Dispatcher
     /**
      * Remove a set of listeners from the dispatcher.
      *
-     * @param  string $event
+     * @param string $event
      * @return void
      */
     public function forget($event)
@@ -81,7 +82,7 @@ class SimpleEventDispatcher implements Dispatcher
     /**
      * Determine if a given event has listeners.
      *
-     * @param  string $eventName
+     * @param string $eventName
      * @return bool
      */
     public function hasListeners($eventName)
@@ -92,8 +93,8 @@ class SimpleEventDispatcher implements Dispatcher
     /**
      * Register an event listener with the dispatcher.
      *
-     * @param  string|array $events
-     * @param  mixed $listener
+     * @param string|array $events
+     * @param mixed $listener
      * @return void
      */
     public function listen($events, $listener)
@@ -105,8 +106,8 @@ class SimpleEventDispatcher implements Dispatcher
     /**
      * Register an event and payload to be fired later.
      *
-     * @param  string $event
-     * @param  array $payload
+     * @param string $event
+     * @param array $payload
      * @return void
      */
     public function push($event, $payload = [])
@@ -119,19 +120,19 @@ class SimpleEventDispatcher implements Dispatcher
     /**
      * Register an event subscriber with the dispatcher.
      *
-     * @param  object|string $subscriber
+     * @param object|string $subscriber
      * @return void
      */
     public function subscribe($subscriber)
     {
-        throw new \BadMethodCallException('Unsupported');
+        throw new BadMethodCallException('Unsupported');
     }
 
     /**
      * Dispatch an event until the first non-null response is returned.
      *
-     * @param  string|object $event
-     * @param  mixed $payload
+     * @param string|object $event
+     * @param mixed $payload
      * @return array|null
      */
     public function until($event, $payload = [])

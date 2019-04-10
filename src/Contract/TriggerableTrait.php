@@ -2,7 +2,9 @@
 
 namespace Sayla\Objects\Contract;
 
+use Closure;
 use Sayla\Objects\Exception\TriggerError;
+use Throwable;
 
 trait TriggerableTrait
 {
@@ -15,14 +17,14 @@ trait TriggerableTrait
         self::$calledTriggers[$dataType] = [];
     }
 
-    public static function triggerHasBeenCalled(string $dataType, string $triggerName): bool
-    {
-        return self::getTriggerCallCount($dataType, $triggerName) >= 0;
-    }
-
     public static function getTriggerCallCount(string $dataType, string $triggerName): int
     {
         return self::$calledTriggers[$dataType][$triggerName] ?? 0;
+    }
+
+    public static function triggerHasBeenCalled(string $dataType, string $triggerName): bool
+    {
+        return self::getTriggerCallCount($dataType, $triggerName) >= 0;
     }
 
     /**
@@ -33,7 +35,7 @@ trait TriggerableTrait
      */
     public function __invoke(string $name, ...$args)
     {
-        $dataTypeName = $this->getDataType();
+        $dataTypeName = $this->dataTypeName();
         if (!isset(self::$calledTriggers[$dataTypeName][$name])) {
             self::$calledTriggers[$dataTypeName][$name] = 1;
         } else {
@@ -49,13 +51,25 @@ trait TriggerableTrait
                     call_user_func_array($trigger, $args);
                     unset($this->triggers[$name][$i]);
                     $fired++;
-                } catch (\Throwable $exception) {
+                } catch (Throwable $exception) {
                     $fullTriggerName = $dataTypeName . '.*' . $name;
                     throw new TriggerError($fullTriggerName, $exception);
                 }
             }
         }
         return $fired;
+    }
+
+    /**
+     * @param string $triggerName
+     * @param callable $callable
+     */
+    protected function addTrigger(string $triggerName, callable $callable): void
+    {
+        if ($callable instanceof Closure) {
+            $callable = $callable->bindTo($this);
+        }
+        $this->triggers[$triggerName][] = $callable;
     }
 
     /**
@@ -81,18 +95,6 @@ trait TriggerableTrait
             return 0;
         }
         return count($this->triggers[$triggerName]);
-    }
-
-    /**
-     * @param string $triggerName
-     * @param callable $callable
-     */
-    protected function addTrigger(string $triggerName, callable $callable): void
-    {
-        if ($callable instanceof \Closure) {
-            $callable = $callable->bindTo($this);
-        }
-        $this->triggers[$triggerName][] = $callable;
     }
 
 }

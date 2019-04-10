@@ -4,6 +4,8 @@ namespace Sayla\Objects\Support\Illuminate;
 
 use Faker\Generator as FakerGenerator;
 use Illuminate\Contracts\Container\Container;
+use Illuminate\Contracts\Validation\Factory;
+use Sayla\Objects\Builder\Builder;
 use Sayla\Objects\DataType\DataTypeManager;
 use Sayla\Objects\ObjectsBindings;
 use Sayla\Objects\Stubs\StubFactory;
@@ -16,12 +18,21 @@ class LaravelObjectsBindings extends ObjectsBindings
     {
         if ($bootValidationFactory = $this->option('bootValidationFactory')) {
             $bootValidationFactory = is_bool($bootValidationFactory)
-                ? \Illuminate\Contracts\Validation\Factory::class
+                ? Factory::class
                 : $bootValidationFactory;
             ValidationBuilder::setSharedValidationFactory(
                 \Illuminate\Container\Container::getInstance()->make($bootValidationFactory)
             );
         }
+
+        Builder::addOptionSet(
+            ['store.driver' => 'eloquent'],
+            [
+                'traits' => [
+                    EloquentObjectTrait::class
+                ]
+            ]
+        );
     }
 
     protected function configureOptions($optionsResolver): void
@@ -44,9 +55,6 @@ class LaravelObjectsBindings extends ObjectsBindings
      */
     protected function prepareLaravelBindings(array $bindings)
     {
-        $bindings['dataTypeManager'][1] = function ($app) {
-            return new DataTypeManager($app['events']);
-        };
         $bindings['objectStubs'] = [
             StubFactory::class,
             function (Container $app) {

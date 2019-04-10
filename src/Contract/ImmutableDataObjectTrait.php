@@ -21,6 +21,11 @@ trait ImmutableDataObjectTrait
         return $this->getDirtyObject();
     }
 
+    protected function forceSetAttributeValue(string $attributeName, $value)
+    {
+        parent::setAttributeValue($attributeName, $value);
+    }
+
     /**
      * @return static
      */
@@ -41,6 +46,14 @@ trait ImmutableDataObjectTrait
     }
 
     /**
+     * @return bool
+     */
+    public function isMutable(): bool
+    {
+        return $this->isInitializing() || $this->isStoring() || $this->isResolving();
+    }
+
+    /**
      * @param string $attribute
      */
     protected function removeAttribute(string $attribute)
@@ -50,14 +63,6 @@ trait ImmutableDataObjectTrait
         } else {
             unset($this->workingAttributes[$attribute]);
         }
-    }
-
-    /**
-     * @return bool
-     */
-    public function isMutable(): bool
-    {
-        return $this->isInitializing() || $this->isStoring() || $this->isResolving();
     }
 
     protected function resetDirty(): void
@@ -80,10 +85,5 @@ trait ImmutableDataObjectTrait
             $this->workingAttributes = $this->toArray();
             $this->setAttributes($atts);
         }
-    }
-
-    protected function forceSetAttributeValue(string $attributeName, $value)
-    {
-        parent::setAttributeValue($attributeName, $value);
     }
 }

@@ -2,191 +2,224 @@
 
 namespace Sayla\Objects\Builder;
 
-use Sayla\Objects\Attribute\PropertyTypeSet;
-use Sayla\Objects\Contract\DataType;
-use Sayla\Objects\Contract\PropertyType;
-use Sayla\Objects\DataType\StandardDataType;
-use Sayla\Objects\DataType\StoringDataType;
-use Sayla\Objects\Transformers\ValueTransformerFactory;
-use Symfony\Component\OptionsResolver\OptionsResolver;
+use Nette\PhpGenerator\ClassType;
+use Nette\PhpGenerator\PhpNamespace;
+use Nette\PhpGenerator\PsrPrinter;
+use Sayla\Exception\Error;
+use Sayla\Objects\Attribute\PropertyType\TransformationDescriptorMixin;
+use Sayla\Objects\Contract\IDataObject;
+use Sayla\Objects\Contract\StorableObject;
+use Sayla\Objects\DataType\DataType;
+use Sayla\Objects\DataType\DataTypeDescriptor;
+use Sayla\Objects\StorableTrait;
+use Sayla\Objects\Transformers\AttributeValueTransformer;
 
-class Builder
+class ClassWriter
 {
-    /** @var callable[] */
-    protected $buildCallbacks = [];
-    /** @var callable */
-    protected $optionsCallback;
-    protected $options = [];
-    protected $store = null;
-    /** @var PropertyType[] */
-    protected $propertyTypes = [];
-    /** @var string */
-    private $dataTypeClass;
+    protected $classNamespace;
+    protected $codeOutputDirectory;
+    private $descriptorClassSuffix = 'Descriptor';
+    private $interfaceSuffix = 'DT';
+    private $traitSuffix = 'Trait';
 
     /**
-     * DataTypeBuilder constructor.
-     * @param string $objectClass
+     * ClassWriter constructor.
+     * @param $classNamespace
+     * @param $codeOutputDirectory
      */
-    public function __construct(string $objectClass)
+    public function __construct(string $classNamespace, string $codeOutputDirectory)
     {
-        $this->options['objectClass'] = $objectClass;
+        $this->classNamespace = new PhpNamespace($classNamespace);
+        $this->codeOutputDirectory = $codeOutputDirectory;
+    }
+
+    public function __invoke(DataType $dataType)
+    {
+        $descriptorClass = $this->writeDescriptorClass($dataType->getDescriptor());
+        $classes = $this->writeObjectClass($dataType, $descriptorClass->getName());
+        $classes['desc'] = $descriptorClass;
+        $this->createFile($classes['dt']);
+        $this->createFile($classes['trait'], $classes['desc']);
     }
 
     /**
-     * @param string $optionName
-     * @param $optionValue
-     * @return $this
+     * @param \Sayla\Objects\DataType\DataType $dataType
+     * @param \Nette\PhpGenerator\ClassType $class
+     * @throws \ErrorException
+     * @throws \Sayla\Exception\Error
      */
-    public function __call(string $optionName, $optionValues)
+    protected function addAttributeAnnotations(DataType $dataType, ClassType $class): void
     {
-        $this->options[$optionName] = $optionValues[0] ?? null;
-        return $this;
-    }
-
-    public function addPropertyType(PropertyType $propertyType)
-    {
-        $this->propertyTypes[$propertyType::getHandle()] = $propertyType;
-        return $this;
-    }
-
-    /**
-     * @param array $attributeDefinitions
-     * @return $this
-     */
-    public function attributeDefinitions(array $attributeDefinitions)
-    {
-        $this->options[__FUNCTION__] = $attributeDefinitions;
-        return $this;
-    }
-
-    /**
-     * @return \Sayla\Objects\Contract\DataType
-     */
-    public function build()
-    {
-        $dataType = self::makeDataType($this->getDataTypeClass(), $this->getOptions());
-        if (filled($this->buildCallbacks)) {
-            $callbacks = $this->buildCallbacks;
-            $postBuild = array_pull($callbacks, 'post');
-            foreach ($this->buildCallbacks as $buildCallback)
-                call_user_func($buildCallback, $dataType);
-            if ($postBuild) {
-                call_user_func($postBuild, $dataType);
+        /** @var \Sayla\Objects\Attribute\PropertyType\TransformationDescriptorMixin $transformerMixin */
+        $transformerMixin = $dataType->getDescriptor()->getMixin(TransformationDescriptorMixin::class);
+        $transformer = $transformerMixin->getTransformer();
+        foreach (array_sort($transformer->getAttributeNames()) as $attributeName) {
+            try {
+                $valueTransformer = $transformer->getValueTransformer($attributeName);
+                $varType =
+                    $valueTransformer instanceof AttributeValueTransformer
+                        ? qualify_var_type($valueTransformer->getVarType())
+                        : $valueTransformer->getScalarType() ?: ($dataType
+                        ->getAttributes()
+                        ->getAttribute($attributeName)
+                        ->getTypeHandle());
+            } catch (Error $exception) {
+                $varType = $transformer->getAttributeOptions()[$attributeName]['type'];
             }
+            $class->addComment('@property ' . $varType . ' ' . $attributeName);
         }
-        return $dataType;
     }
 
-    /**
-     * @param string|DataType $dataTypeClass
-     * @param array $options
-     * @return \Sayla\Objects\Contract\DataType
-     */
-    public static function makeDataType(string $dataTypeClass, array $options): DataType
+    protected function createFile(ClassType ...$classes): void
     {
-        return forward_static_call([$dataTypeClass, 'build'], $options);
-    }
-
-    public function getOptions(): array
-    {
-        $options = $this->getOptionResolver()->resolve($this->options);
-        foreach ($this->propertyTypes as $propertyType)
-            $options['propertyTypes']->push($propertyType);
-        if (isset($this->optionsCallback)) {
-            $options = call_user_func($this->optionsCallback, $options) ?? $options;
+        $printer = new PsrPrinter();
+        $code = '<?php ' . PHP_EOL
+            . $printer->printNamespace($this->classNamespace) . PHP_EOL;
+        foreach ($classes as $class) {
+            $code .= $printer->printClass($class) . PHP_EOL;
         }
-        return $options;
+        file_put_contents("{$this->codeOutputDirectory}/{$classes[0]->getName()}.php", $code);
     }
 
-    private function getOptionResolver()
+    /**
+     * @param string $descriptorClassSuffix
+     * @return ClassWriter
+     */
+    public function setDescriptorClassSuffix(string $descriptorClassSuffix): ClassWriter
     {
-        if (!isset($this->optionsResolver)) {
-            $resolver = new OptionsResolver();
-            forward_static_call($this->getDataTypeClass() . '::configureOptions', $resolver);
-            $this->optionsResolver = $resolver;
+        $this->descriptorClassSuffix = $descriptorClassSuffix;
+        return $this;
+    }
+
+    /**
+     * @param string $interfaceSuffix
+     * @return ClassWriter
+     */
+    public function setInterfaceSuffix(string $interfaceSuffix): ClassWriter
+    {
+        $this->interfaceSuffix = $interfaceSuffix;
+        return $this;
+    }
+
+    /**
+     * @param string $traitSuffix
+     * @return ClassWriter
+     */
+    public function setTraitSuffix(string $traitSuffix): ClassWriter
+    {
+        $this->traitSuffix = $traitSuffix;
+        return $this;
+    }
+
+    protected function writeDescriptorClass(DataTypeDescriptor $descriptor): ClassType
+    {
+        $className = $this->normalizeClassName($descriptor->getObjectClass(), $this->descriptorClassSuffix);
+        $class = new ClassType($className, $this->classNamespace);
+        $class->setFinal(true)->setExtends(qualify_var_type(DataTypeDescriptor::class));
+        $annotatedMixins = [];
+        foreach ($descriptor->getMixins()->getMixinMethods() as $mixin) {
+            if (isset($class->methods[$mixin['name']])) {
+                $annotatedMixins[] = $mixin['class'];
+                continue;
+            }
+
+            $args = [];
+            $method = $class->addMethod($mixin['name']);
+            foreach ($mixin['parameters'] as $parameter) {
+                $param = $method->addParameter($parameter['name'])->setTypeHint($parameter['type']);
+                if ($parameter['optional']) {
+                    $param->setDefaultValue(null);
+                }
+                $args[] = '$' . $parameter['name'];
+            }
+            $delegationCallCode = '$mixin->' . $mixin['methodName'] . '(' . join(', ', $args) . ');';
+            $lines = [
+                '/**  @var \\' . $mixin['class'] . ' $mixin */',
+                '$mixin = $this->mixins[' . var_str($mixin['mixinName']) . '];',
+            ];
+            if (
+                $mixin['returnType'] !== 'void'
+                && (
+                    ($mixin['returnType'] && !str_is('set[A-Z]', $mixin['name']))
+                    || !str_is(['is[A-Z]', 'get[A-Z]'], $mixin['name'])
+                )
+            ) {
+                $lines[] = 'return ' . $delegationCallCode;
+                $method->setReturnType($mixin['returnType']);
+            } else {
+
+                $lines[] = $delegationCallCode;
+                $lines[] = 'return $this;';
+                $method->setReturnType('self');
+            }
+            $method->setBody(
+                join(PHP_EOL, $lines)
+            );
         }
-        return $this->optionsResolver;
-    }
-
-    public function name(string $name)
-    {
-        $this->options[__FUNCTION__] = $name;
-        return $this;
+        foreach (array_unique($annotatedMixins) as $mixinClass)
+            $class->addComment('@mixin \\' . $mixinClass);
+        return $class;
     }
 
     /**
-     * @param \Sayla\Objects\ObjectDispatcher $objectDispatcher
-     * @return $this
+     * @param \Sayla\Objects\DataType\DataType $dataType
+     * @param string $descriptorClass
+     * @return ClassType[]
+     * @throws \ErrorException
+     * @throws \Sayla\Exception\Error
      */
-    public function objectDispatcher(\Sayla\Objects\ObjectDispatcher $objectDispatcher)
+    protected function writeObjectClass(DataType $dataType, string $descriptorClass): array
     {
-        $this->options[__FUNCTION__] = $objectDispatcher;
-        return $this;
-    }
+        $classes = [];
+        $classes['dt'] = $interface = new ClassType(
+            $this->normalizeClassName($dataType->getName(), $this->interfaceSuffix),
+            $this->classNamespace
+        );
+        $interface->setType(ClassType::TYPE_INTERFACE);
+        foreach ($dataType->getInterfaces() as $interfaceClass)
+            $interface->addExtend(qualify_var_type($interfaceClass));
 
-    public function onOptionsResolution(callable $callback)
-    {
-        $this->optionsCallback = $callback;
-        return $this;
-    }
-
-    /**
-     * @param \Sayla\Objects\Contract\PropertyType[]|PropertyTypeSet $propertyTypes
-     * @return $this
-     */
-    public function propertyTypes(PropertyTypeSet $propertyTypes)
-    {
-        $this->options[__FUNCTION__] = $propertyTypes;
-        return $this;
-    }
-
-    public function store(string $driver, array $options = [], string $storeName = null)
-    {
-        $storeName = $storeName ?? $this->options['objectClass'];
-        if (!isset($this->dataTypeClass)) {
-            $this->setDataTypeClass(StoringDataType::class);
-            $this->options['storeName'] = $this->store['name'];
+        if ($dataType->hasStore()) {
+            $interface->addExtend(qualify_var_type(StorableObject::class));
+        } else {
+            $interface->addExtend(qualify_var_type(IDataObject::class));
         }
-        $this->store = [
-            'name' => $storeName,
-            'options' => $options,
-            'driver' => $driver,
-        ];
-        return $this;
+
+        $classes['trait'] = $trait = new ClassType(
+            $this->normalizeClassName($dataType->getName(), $this->traitSuffix),
+            $this->classNamespace
+        );
+        $trait->setType(ClassType::TYPE_TRAIT);
+        $trait->addMethod('dataTypeName')
+            ->setReturnType('string')
+            ->setStatic(true)
+            ->setBody('return ' . var_str($dataType->getName()) . ';')
+            ->setVisibility(ClassType::VISIBILITY_PUBLIC);
+        $trait->addComment("@method static {$descriptorClass} descriptor()");
+        foreach ($dataType->getTraits() as $traitClass)
+            $trait->addTrait(qualify_var_type($traitClass));
+
+        if ($dataType->hasStore()) {
+            $trait->addTrait(qualify_var_type(StorableTrait::class));
+        }
+
+
+        if ($dataType->getDescriptor()->hasMixin(TransformationDescriptorMixin::class)) {
+            $this->addAttributeAnnotations($dataType, $trait);
+            $this->addAttributeAnnotations($dataType, $interface);
+        }
+        return $classes;
     }
 
     /**
-     * @param string $dataTypeClass
-     */
-    public function setDataTypeClass(string $dataTypeClass)
-    {
-        $this->dataTypeClass = $dataTypeClass;
-        return $this;
-    }
-
-    /**
-     * @param \Sayla\Objects\Transformers\ValueTransformerFactory $valueFactory
-     * @return $this
-     */
-    public function valueFactory(ValueTransformerFactory $valueFactory)
-    {
-        $this->options[__FUNCTION__] = $valueFactory;
-        return $this;
-    }
-
-    /**
+     * @param string $possibleClassName
+     * @param string $suffix
      * @return string
      */
-    public function getDataTypeClass(): string
+    private function normalizeClassName(string $possibleClassName, string $suffix): string
     {
-        return $this->dataTypeClass ?? StandardDataType::class;
-    }
-
-    /**
-     * @return array
-     */
-    public function getStoreOptions(): ?array
-    {
-        return $this->store;
+        $_className = $possibleClassName . $suffix;
+        $className = class_basename($_className) ?? $_className;
+        return $className;
     }
 }

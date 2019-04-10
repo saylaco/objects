@@ -6,18 +6,13 @@ use Sayla\Objects\Builder\Builder;
 
 interface RegistrarRepository
 {
+    public function addBuilder(Builder $builder);
+
     /**
      * A list of object with two properties:
-     *   $info->dataTypeClass - class of datatype
-     *   $info->name - name of object
-     *   $info->store - store options
      *
-     * @return iterable|object[]
+     * @return array[]
      */
-    public function getObjects():iterable;
-
-    public function getOptions(string $objectName): array;
-
-    public function addObject(string $objectName, Builder $builder);
+    public function getBuilders(): iterable;
 
 }

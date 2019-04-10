@@ -4,13 +4,13 @@ namespace Sayla\Objects\Validation;
 
 class ValidationDescriptor
 {
-    public $rules;
-    public $label;
-    public $messages;
-    public $deleteRules;
-    public $updateRules;
     public $createRules;
+    public $deleteRules;
+    public $label;
     public $labels;
+    public $messages;
+    public $rules;
+    public $updateRules;
     private $name;
 
     /**

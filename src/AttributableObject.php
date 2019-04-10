@@ -2,6 +2,7 @@
 
 namespace Sayla\Objects;
 
+use ArrayIterator;
 use Sayla\Objects\Contract\Attributable;
 
 class AttributableObject implements Attributable
@@ -15,131 +16,6 @@ class AttributableObject implements Attributable
     public function __construct(array $attributes = [])
     {
         $this->fill($attributes);
-    }
-
-    /**
-     * Fill the model with an array of attributes.
-     *
-     * @param iterable $attributes
-     * @return $this
-     */
-    public function fill(iterable $attributes)
-    {
-        foreach ($attributes as $key => $value) {
-            $this->setAttributeValue($key, $value);
-        }
-        return $this;
-    }
-
-    /**
-     * @return \ArrayIterator
-     */
-    public function getIterator()
-    {
-        return new \ArrayIterator($this->attributes);
-    }
-
-    /**
-     * @param string $attributeName
-     * @return bool
-     */
-    public function isAttributeSet(string $attributeName): bool
-    {
-        return array_key_exists($attributeName, $this->attributes);
-    }
-
-    public function offsetExists($offset)
-    {
-        return $this->isRetrievableAttribute($offset);
-    }
-
-    public function offsetGet($offset)
-    {
-        return $this->getAttributeValue($offset);
-    }
-
-    public function offsetSet($offset, $value)
-    {
-        $this->setAttributeValue($offset, $value);
-    }
-
-    public function offsetUnset($offset)
-    {
-        $this->removeAttribute($offset);
-    }
-
-    public function pluck(...$attributeNames)
-    {
-        if (func_num_args() == 1 && is_array($attributeNames[0])) {
-            $attributeNames = $attributeNames[0];
-        }
-        return array_only($this->attributes, $attributeNames);
-    }
-
-    /**
-     * @return array
-     */
-    public function toArray(): array
-    {
-        return $this->attributes;
-    }
-
-    /**
-     * Get the collection of items as JSON.
-     *
-     * @param  int $options
-     * @return string
-     */
-    public function toJson($options = 0)
-    {
-        return json_encode($this->jsonSerialize(), $options);
-    }
-
-    /**
-     * @param string $attributeName
-     * @param $value
-     */
-    protected function setAttributeValue(string $attributeName, $value): void
-    {
-        if (self::class != static::class
-            && $this->hasAttributeSetter($attributeName)) {
-            $this->{$this->getAttributeSetter($attributeName)}($value);
-        } else {
-            $this->setRawAttribute($attributeName, $value);
-        }
-    }
-
-    /**
-     * @param string $attributeName
-     * @return string
-     */
-    public function hasAttributeSetter(string $attributeName): bool
-    {
-        return method_exists($this, $this->getAttributeSetter($attributeName));
-    }
-
-    /**
-     * @param string $attributeName
-     * @return string
-     */
-    public function getAttributeSetter(string $attributeName): string
-    {
-        return $setterMethod = 'set' . ucfirst($attributeName) . 'Attribute';
-    }
-
-    protected function setRawAttribute(string $attributeName, $value)
-    {
-        $this->attributes[$attributeName] = $value;
-    }
-
-    /**
-     * Convert the object into something JSON serializable.
-     *
-     * @return array
-     */
-    public function jsonSerialize()
-    {
-        return self::serializeData($this->attributes);
     }
 
     /**
@@ -175,12 +51,35 @@ class AttributableObject implements Attributable
     }
 
     /**
+     * Fill the model with an array of attributes.
+     *
+     * @param iterable $attributes
+     * @return $this
+     */
+    public function fill(iterable $attributes)
+    {
+        foreach ($attributes as $key => $value) {
+            $this->setAttributeValue($key, $value);
+        }
+        return $this;
+    }
+
+    /**
      * @param string $attributeName
      * @return string
      */
     public function getAttributeGetter(string $attributeName): string
     {
         return $getterMethod = 'get' . ucfirst($attributeName) . 'Attribute';
+    }
+
+    /**
+     * @param string $attributeName
+     * @return string
+     */
+    public function getAttributeSetter(string $attributeName): string
+    {
+        return $setterMethod = 'set' . ucfirst($attributeName) . 'Attribute';
     }
 
     protected function getAttributeValue(string $attributeName)
@@ -190,6 +89,14 @@ class AttributableObject implements Attributable
             return $this->{$this->getAttributeGetter($attributeName)}($value);
         }
         return $value;
+    }
+
+    /**
+     * @return \ArrayIterator
+     */
+    public function getIterator()
+    {
+        return new ArrayIterator($this->attributes);
     }
 
     /**
@@ -212,11 +119,29 @@ class AttributableObject implements Attributable
 
     /**
      * @param string $attributeName
+     * @return string
+     */
+    public function hasAttributeSetter(string $attributeName): bool
+    {
+        return method_exists($this, $this->getAttributeSetter($attributeName));
+    }
+
+    /**
+     * @param string $attributeName
      * @return bool
      */
     public function isAttributeFilled(string $attributeName): bool
     {
         return isset($this->attributes[$attributeName]);
+    }
+
+    /**
+     * @param string $attributeName
+     * @return bool
+     */
+    public function isAttributeSet(string $attributeName): bool
+    {
+        return array_key_exists($attributeName, $this->attributes);
     }
 
     /**
@@ -235,6 +160,36 @@ class AttributableObject implements Attributable
     }
 
     /**
+     * Convert the object into something JSON serializable.
+     *
+     * @return array
+     */
+    public function jsonSerialize()
+    {
+        return self::serializeData($this->attributes);
+    }
+
+    public function offsetExists($offset)
+    {
+        return $this->isRetrievableAttribute($offset);
+    }
+
+    public function offsetGet($offset)
+    {
+        return $this->getAttributeValue($offset);
+    }
+
+    public function offsetSet($offset, $value)
+    {
+        $this->setAttributeValue($offset, $value);
+    }
+
+    public function offsetUnset($offset)
+    {
+        $this->removeAttribute($offset);
+    }
+
+    /**
      * @param iterable $attributeNames
      * @return \Sayla\Objects\AttributableObject
      */
@@ -244,6 +199,14 @@ class AttributableObject implements Attributable
         foreach ($attributeNames as $attributeName)
             $atts[$attributeName] = $this[$attributeName];
         return self::make($atts);
+    }
+
+    public function pluck(...$attributeNames)
+    {
+        if (func_num_args() == 1 && is_array($attributeNames[0])) {
+            $attributeNames = $attributeNames[0];
+        }
+        return array_only($this->attributes, $attributeNames);
     }
 
     /**
@@ -259,9 +222,47 @@ class AttributableObject implements Attributable
         return serialize($this->attributes);
     }
 
+    /**
+     * @param string $attributeName
+     * @param $value
+     */
+    protected function setAttributeValue(string $attributeName, $value): void
+    {
+        if (self::class != static::class
+            && $this->hasAttributeSetter($attributeName)) {
+            $this->{$this->getAttributeSetter($attributeName)}($value);
+        } else {
+            $this->setRawAttribute($attributeName, $value);
+        }
+    }
+
     protected function setAttributes(array $attributes)
     {
         $this->attributes = $attributes;
+    }
+
+    protected function setRawAttribute(string $attributeName, $value)
+    {
+        $this->attributes[$attributeName] = $value;
+    }
+
+    /**
+     * @return array
+     */
+    public function toArray(): array
+    {
+        return $this->attributes;
+    }
+
+    /**
+     * Get the collection of items as JSON.
+     *
+     * @param int $options
+     * @return string
+     */
+    public function toJson($options = 0)
+    {
+        return json_encode($this->jsonSerialize(), $options);
     }
 
     public function unserialize($serialized)

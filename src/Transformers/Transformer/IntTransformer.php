@@ -18,6 +18,15 @@ class IntTransformer implements ValueTransformer
         return blank($value) ? null : $this->getNumericValue($value);
     }
 
+    /**
+     * @param $value
+     * @return float
+     */
+    public function getNumericValue($value)
+    {
+        return intval($value);
+    }
+
     public function getScalarType(): string
     {
         return 'int';
@@ -30,15 +39,6 @@ class IntTransformer implements ValueTransformer
     public function smash($value)
     {
         return blank($value) ? null : $this->getNumericValue($value);
-    }
-
-    /**
-     * @param $value
-     * @return float
-     */
-    public function getNumericValue($value)
-    {
-        return intval($value);
     }
 
 }

@@ -2,15 +2,13 @@
 
 namespace Sayla\Objects\Transformers;
 
+use ErrorException;
 use Sayla\Exception\Error;
 use Sayla\Objects\Exception\TransformationError;
+use Throwable;
 
 class Transformer
 {
-    /**
-     * @var ValueTransformerFactory
-     */
-    private static $factoryInstance;
     /**
      * @var string[]
      */
@@ -19,6 +17,10 @@ class Transformer
         'pk' => 'databaseKey',
         'integer' => 'int',
     ];
+    /**
+     * @var ValueTransformerFactory
+     */
+    private static $factoryInstance;
     /**
      * Definitions for transforming data types
      * @var mixed[][]
@@ -33,13 +35,13 @@ class Transformer
      */
     protected $skipObjectSmashing = false;
     /**
-     * @var array
-     */
-    private $valueTransformers = [];
-    /**
      * @var ValueTransformerFactory
      */
     private $valueFactory;
+    /**
+     * @var array
+     */
+    private $valueTransformers = [];
 
     /**
      * @param iterable $allOptions
@@ -52,6 +54,14 @@ class Transformer
             $type = array_pull($options, 'type');
             $this->addAttribute($name, $type, $options);
         }
+    }
+
+    /**
+     * @param \Sayla\Objects\Transformers\ValueTransformerFactory $resolver
+     */
+    public static function setValueFactory(ValueTransformerFactory $resolver)
+    {
+        self::$factoryInstance = $resolver;
     }
 
     /**
@@ -75,11 +85,21 @@ class Transformer
     }
 
     /**
-     * @param \Sayla\Objects\Transformers\ValueTransformerFactory $resolver
+     * @param string $key
+     * @param null $value
+     * @return mixed|null
+     * @throws \Sayla\Exception\Error
      */
-    public static function setValueFactory(ValueTransformerFactory $resolver)
+    public function build(string $key, $value = null)
     {
-        self::$factoryInstance = $resolver;
+        try {
+            if ($this->isNotTransformable($key)) {
+                return $value;
+            }
+            return $this->callBuilder($key, $value);
+        } catch (Throwable $exception) {
+            throw new Error("Failed transformation of \${$key}", $exception);
+        }
     }
 
     /**
@@ -95,94 +115,6 @@ class Transformer
         foreach ($attributes as $k => $v)
             $attributes[$k] = $this->build($k, $v);
         return $attributes;
-    }
-
-    /**
-     * @param string $key
-     * @param null $value
-     * @return mixed|null
-     * @throws \Sayla\Exception\Error
-     */
-    public function build(string $key, $value = null)
-    {
-        try {
-            if ($this->isNotTransformable($key)) {
-                return $value;
-            }
-            return $this->callBuilder($key, $value);
-        } catch (\Throwable $exception) {
-            throw new Error("Failed transformation of \${$key}", $exception);
-        }
-    }
-
-    /**
-     * @param $key
-     * @return bool
-     */
-    protected function isNotTransformable($key): bool
-    {
-        return ($this->skipNonAttributes && !$this->isAttribute($key))
-            || ($this->isAttribute($key)
-                && $this->skipObjectSmashing
-                && in_array($this->getAttributeOptions($key)->type, ['objectCollection', 'object']));
-    }
-
-    /**
-     * @param string $attr
-     * @return bool
-     */
-    public function isAttribute(string $attr): bool
-    {
-        return isset($this->options[$attr]);
-    }
-
-    /**
-     * @param string $attr
-     * @return Options|Options[]
-     * @throws \ErrorException
-     */
-    public function getAttributeOptions(string $attr = null)
-    {
-        if ($attr) {
-            if (!$this->isAttribute($attr)) {
-                throw new \ErrorException('Transformer is not configured for "' . $attr . '"');
-            }
-            return $this->options[$attr];
-        }
-        return $this->options;
-    }
-
-    /**
-     * @param string $key
-     * @param mixed $value
-     * @return mixed
-     */
-    public function callBuilder(string $key, $value)
-    {
-        return call_user_func([$this->getValueTransformer($key), 'build'], $value);
-    }
-
-
-    /**
-     * @param $key
-     * @return \Sayla\Objects\Transformers\ValueTransformer
-     * @throws \ErrorException
-     */
-    public function getValueTransformer($key): ValueTransformer
-    {
-        if (isset($this->valueTransformers[$key])) {
-            return $this->valueTransformers[$key];
-        }
-        $options = $this->getAttributeOptions($key);
-        return $this->valueTransformers[$key] = $this->getFactory()->getTransformer($options->type, $options);
-    }
-
-    /**
-     * @return ValueTransformerFactory
-     */
-    public function getFactory(): ValueTransformerFactory
-    {
-        return $this->valueFactory ?? ValueTransformerFactory::getInstance();
     }
 
     /**
@@ -205,6 +137,50 @@ class Transformer
     }
 
     /**
+     * @param string $key
+     * @param mixed $value
+     * @return mixed
+     */
+    public function callBuilder(string $key, $value)
+    {
+        return call_user_func([$this->getValueTransformer($key), 'build'], $value);
+    }
+
+    /**
+     * @param string $key
+     * @param $value
+     * @return mixed
+     */
+    public function callSmasher(string $key, $value)
+    {
+        return call_user_func([$this->getValueTransformer($key), 'smash'], $value);
+    }
+
+    /**
+     * @return string[]
+     */
+    public function getAttributeNames(): array
+    {
+        return array_keys($this->options);
+    }
+
+    /**
+     * @param string $attr
+     * @return Options|Options[]
+     * @throws \ErrorException
+     */
+    public function getAttributeOptions(string $attr = null)
+    {
+        if ($attr) {
+            if (!$this->isAttribute($attr)) {
+                throw new ErrorException('Transformer is not configured for "' . $attr . '"');
+            }
+            return $this->options[$attr];
+        }
+        return $this->options;
+    }
+
+    /**
      * @param string $attributeName
      * @return \Closure
      */
@@ -213,6 +189,14 @@ class Transformer
         return function ($value, ...$args) use ($attributeName) {
             return $this->callBuilder($attributeName, $value);
         };
+    }
+
+    /**
+     * @return ValueTransformerFactory
+     */
+    public function getFactory(): ValueTransformerFactory
+    {
+        return $this->valueFactory ?? ValueTransformerFactory::getInstance();
     }
 
     /**
@@ -227,13 +211,17 @@ class Transformer
     }
 
     /**
-     * @param string $key
-     * @param $value
-     * @return mixed
+     * @param $key
+     * @return \Sayla\Objects\Transformers\ValueTransformer
+     * @throws \ErrorException
      */
-    public function callSmasher(string $key, $value)
+    public function getValueTransformer($key): ValueTransformer
     {
-        return call_user_func([$this->getValueTransformer($key), 'smash'], $value);
+        if (isset($this->valueTransformers[$key])) {
+            return $this->valueTransformers[$key];
+        }
+        $options = $this->getAttributeOptions($key);
+        return $this->valueTransformers[$key] = $this->getFactory()->getTransformer($options->type, $options);
     }
 
     /**
@@ -249,11 +237,24 @@ class Transformer
     }
 
     /**
-     * @return string[]
+     * @param string $attr
+     * @return bool
      */
-    public function getAttributeNames(): array
+    public function isAttribute(string $attr): bool
     {
-        return array_keys($this->options);
+        return isset($this->options[$attr]);
+    }
+
+    /**
+     * @param $key
+     * @return bool
+     */
+    protected function isNotTransformable($key): bool
+    {
+        return ($this->skipNonAttributes && !$this->isAttribute($key))
+            || ($this->isAttribute($key)
+                && $this->skipObjectSmashing
+                && in_array($this->getAttributeOptions($key)->type, ['objectCollection', 'object']));
     }
 
     /**
@@ -295,6 +296,24 @@ class Transformer
     }
 
     /**
+     * @param string $key
+     * @param null $value
+     * @return mixed|null
+     * @throws \Sayla\Objects\Exception\TransformationError
+     */
+    public function smash(string $key, $value = null)
+    {
+        try {
+            if ($this->isNotTransformable($key)) {
+                return $value;
+            }
+            return $this->callSmasher($key, $value);
+        } catch (Throwable $e) {
+            throw new TransformationError('Failed transformation of $' . $key, $e);
+        }
+    }
+
+    /**
      * @param $attributes
      * @return mixed
      * @throws \Sayla\Objects\Exception\TransformationError
@@ -308,24 +327,6 @@ class Transformer
             $attributes[$k] = $this->smash($k, $v);
         }
         return $attributes;
-    }
-
-    /**
-     * @param string $key
-     * @param null $value
-     * @return mixed|null
-     * @throws \Sayla\Objects\Exception\TransformationError
-     */
-    public function smash(string $key, $value = null)
-    {
-        try {
-            if ($this->isNotTransformable($key)) {
-                return $value;
-            }
-            return $this->callSmasher($key, $value);
-        } catch (\Throwable $e) {
-            throw new TransformationError('Failed transformation of $' . $key, $e);
-        }
     }
 
     /**

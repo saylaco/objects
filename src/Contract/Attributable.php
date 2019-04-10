@@ -2,10 +2,13 @@
 
 namespace Sayla\Objects\Contract;
 
+use ArrayAccess;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Contracts\Support\Jsonable;
+use IteratorAggregate;
+use JsonSerializable;
 
-interface Attributable extends Jsonable, Arrayable, \JsonSerializable, \ArrayAccess, \IteratorAggregate
+interface Attributable extends Jsonable, Arrayable, JsonSerializable, ArrayAccess, IteratorAggregate
 {
     /**
      * Populate with an array of attributes.

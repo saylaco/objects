@@ -6,35 +6,30 @@ use Illuminate\Container\Container;
 use Illuminate\Database\Eloquent\Model;
 use Sayla\Objects\Contract\ConfigurableStore;
 use Sayla\Objects\Contract\ObjectStore;
-use Sayla\Objects\DataModel;
+use Sayla\Objects\Contract\StorableObject;
 use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 
 class EloquentStore implements ObjectStore, ConfigurableStore
 {
-    protected $useTransactions = false;
     /** @var Model */
     protected $model;
+    protected $useTransactions = false;
 
     public static function defineOptions(OptionsResolver $resolver): void
     {
         $resolver->setRequired('model');
-        $resolver->setAllowedTypes('model', ['string', \Illuminate\Database\Eloquent\Model::class]);
+        $resolver->setAllowedTypes('model', ['string', Model::class]);
         $resolver->setDefault('useTransactions', false);
         $resolver->setAllowedTypes('useTransactions', 'boolean');
-        $resolver->setNormalizer('model', function (Options $options, $model): \Illuminate\Database\Eloquent\Model {
+        $resolver->setNormalizer('model', function (Options $options, $model): Model {
             if (is_string($model)) {
+                $model = qualify_var_type($model, class_parent_namespace($options['objectClass']));
                 return Container::getInstance()->make($model);
             }
             return $model;
         });
-    }
-
-    public function setOptions(string $name, array $options): void
-    {
-        $this->model = $options['model'] ?? $name;
-        $this->useTransactions = $options['useTransactions'];
     }
 
     public function __toString(): string
@@ -42,7 +37,7 @@ class EloquentStore implements ObjectStore, ConfigurableStore
         return $this->toStoreString();
     }
 
-    public function create(DataModel $object): iterable
+    public function create(StorableObject $object): iterable
     {
         if ($this->useTransactions) {
             return $this->getConnection()->transaction(function () use ($object) {
@@ -52,7 +47,15 @@ class EloquentStore implements ObjectStore, ConfigurableStore
         return $this->createModel($object);
     }
 
-    public function delete(DataModel $object): iterable
+    protected function createModel(StorableObject $object)
+    {
+        $data = $object->datatype()->extract($object);
+        $model = $this->model->newInstance($data);
+        $model->save();
+        return $model->getAttributes();
+    }
+
+    public function delete(StorableObject $object): iterable
     {
         $model = $this->findModel($object->getKey());
         if ($this->useTransactions) {
@@ -63,40 +66,14 @@ class EloquentStore implements ObjectStore, ConfigurableStore
         return $this->deleteModel($model, $object);
     }
 
-    public function toStoreString(): string
-    {
-        return 'Eloquent[' . get_class($this->model) . ']';
-    }
-
-    public function update(DataModel $object): iterable
-    {
-        $model = $this->findModel($object->getKey());
-        if ($this->useTransactions) {
-            return $this->getConnection()->transaction(function () use ($model, $object) {
-                return $this->updateModel($model, $object);
-            });
-        }
-        return $this->updateModel($model, $object);
-    }
-
     /**
-     * @return \Illuminate\Database\Connection
+     * @param Model $model
+     * @param \Sayla\Objects\Contract\StorableObject $object
+     * @return Model
      */
-    protected function getConnection()
+    protected function deleteModel($model, $object)
     {
-        return $this->model->getConnection();
-    }
-
-    /**
-     * @param \Sayla\Objects\DataModel $object
-     * @return array|mixed
-     * @throws \Sayla\Exception\Error
-     */
-    protected function createModel(DataModel $object)
-    {
-        $data = $object->datatype()->extractData($object);
-        $model = $this->model->newInstance($data);
-        $model->save();
+        $model->delete();
         return $model->getAttributes();
     }
 
@@ -110,27 +87,25 @@ class EloquentStore implements ObjectStore, ConfigurableStore
     }
 
     /**
-     * @param Model $model
-     * @param DataModel $object
-     * @return Model
+     * @return \Illuminate\Database\Connection
      */
-    protected function deleteModel($model, $object)
+    protected function getConnection()
     {
-        $model->delete();
-        return $model->getAttributes();
+        return $this->model->getConnection();
     }
 
     /**
-     * @param Model $model
-     * @param DataModel $object
-     * @return Model
+     * @return \Illuminate\Database\Eloquent\Model
      */
-    protected function updateModel($model, $object)
+    public function getModel(): Model
     {
-        $data = $object->datatype()->extractData($object);
-        $model->fill($data);
-        $model->save();
-        return $model->getAttributes();
+        return $this->model;
+    }
+
+    public function setOptions(string $name, array $options): void
+    {
+        $this->model = $options['model'] ?? $name;
+        $this->useTransactions = $options['useTransactions'];
     }
 
     /**
@@ -143,19 +118,40 @@ class EloquentStore implements ObjectStore, ConfigurableStore
         return $this;
     }
 
+    public function toStoreString(): string
+    {
+        return 'Eloquent[' . get_class($this->model) . ']';
+    }
+
+    public function update(StorableObject $object): iterable
+    {
+        $model = $this->findModel($object->getKey());
+        if ($this->useTransactions) {
+            return $this->getConnection()->transaction(function () use ($model, $object) {
+                return $this->updateModel($model, $object);
+            });
+        }
+        return $this->updateModel($model, $object);
+    }
+
+    /**
+     * @param Model $model
+     * @param \Sayla\Objects\Contract\StorableObject $object
+     * @return Model
+     */
+    protected function updateModel($model, $object)
+    {
+        $data = $object->datatype()->extract($object);
+        $model->fill($data);
+        $model->save();
+        return $model->getAttributes();
+    }
+
     /**
      * @return bool
      */
     public function usesTransactions(): bool
     {
         return $this->useTransactions;
-    }
-
-    /**
-     * @return \Illuminate\Database\Eloquent\Model
-     */
-    public function getModel(): \Illuminate\Database\Eloquent\Model
-    {
-        return $this->model;
     }
 }

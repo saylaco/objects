@@ -2,44 +2,49 @@
 
 namespace Sayla\Objects\Builder;
 
-use Sayla\Objects\Attribute\PropertyTypeSet;
-use Sayla\Objects\Contract\DataType;
-use Sayla\Objects\Contract\PropertyType;
-use Sayla\Objects\DataType\StandardDataType;
-use Sayla\Objects\DataType\StoringDataType;
+use Sayla\Objects\DataType\DataType;
+use Sayla\Objects\ObjectDispatcher;
 use Sayla\Objects\Transformers\ValueTransformerFactory;
+use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class Builder
 {
+    private static $optionSets = [];
     /** @var callable[] */
-    protected $buildCallbacks = [];
-    protected $options = [];
+    private $onAddDataTypeCallbacks = [];
+    private $options = [];
     /** @var callable */
-    protected $optionsCallback;
-    /** @var PropertyType[] */
-    protected $propertyTypes = [];
-    protected $store = null;
-    /** @var string */
-    private $dataTypeClass;
+    private $optionsCallback;
+    /** @var callable[] */
+    private $postBuildCallbacks = [];
+    /** @var callable[] */
+    private $preBuildCallbacks = [];
 
     /**
      * DataTypeBuilder constructor.
      * @param string $objectClass
      */
-    public function __construct(string $objectClass)
+    public function __construct(string $objectClass, string $name = null)
     {
         $this->options['objectClass'] = $objectClass;
+        $this->options['name'] = $name ?? $objectClass;
+    }
+
+    public static function addOptionSet(array $matcher, array $options)
+    {
+        self::$optionSets[] = compact('matcher', 'options');
     }
 
     /**
-     * @param string|DataType $dataTypeClass
      * @param array $options
-     * @return \Sayla\Objects\Contract\DataType
+     * @return \Sayla\Objects\Builder\Builder
      */
-    public static function makeDataType(string $dataTypeClass, array $options): DataType
+    public static function makeFromOptions(array $options): self
     {
-        return forward_static_call([$dataTypeClass, 'build'], $options);
+        $builder = new self($options['objectClass'] ?? 'temp');
+        $builder->options = $options;
+        return $builder;
     }
 
     /**
@@ -53,9 +58,9 @@ class Builder
         return $this;
     }
 
-    public function addPropertyType(PropertyType $propertyType)
+    public function afterBuild(callable $callback)
     {
-        $this->propertyTypes[$propertyType::getHandle()] = $propertyType;
+        $this->postBuildCallbacks[] = $callback;
         return $this;
     }
 
@@ -63,47 +68,65 @@ class Builder
      * @param array $attributeDefinitions
      * @return $this
      */
-    public function attributeDefinitions(array $attributeDefinitions)
+    public function attributes(array $attributeDefinitions)
     {
         $this->options[__FUNCTION__] = $attributeDefinitions;
         return $this;
     }
 
-    /**
-     * @return \Sayla\Objects\Contract\DataType
-     */
-    public function build()
+    public function beforeBuild(callable $callback)
     {
-        $dataType = self::makeDataType($this->getDataTypeClass(), $this->getOptions());
-        if (filled($this->buildCallbacks)) {
-            foreach ($this->buildCallbacks as $buildCallback)
-                call_user_func($buildCallback, $dataType);
-        }
-        return $dataType;
-    }
-
-    /**
-     * @return string
-     */
-    public function getDataTypeClass(): string
-    {
-        return $this->dataTypeClass ?? StandardDataType::class;
-    }
-
-    /**
-     * @param string $dataTypeClass
-     */
-    public function setDataTypeClass(string $dataTypeClass)
-    {
-        $this->dataTypeClass = $dataTypeClass;
+        $this->preBuildCallbacks[] = $callback;
         return $this;
+    }
+
+    /**
+     * @param string $classFile
+     * @return $this
+     */
+    public function classFile(?string $classFile)
+    {
+        $this->options[__FUNCTION__] = $classFile;
+        return $this;
+    }
+
+    public function getName(): string
+    {
+        return $this->options['name'];
+    }
+
+    public function getObjectClass(): string
+    {
+        return $this->options['objectClass'];
     }
 
     public function getOptions(): array
     {
-        $options = $this->getOptionResolver()->resolve($this->options);
-        foreach ($this->propertyTypes as $propertyType)
-            $options['propertyTypes']->push($propertyType);
+        if (filled($this->preBuildCallbacks)) {
+            foreach ($this->preBuildCallbacks as $buildCallback) {
+                call_user_func($buildCallback, $this);
+            }
+        }
+
+        $options = $this->options;
+
+        foreach (self::$optionSets as $optionSet) {
+            foreach ($optionSet['matcher'] as $k => $v) {
+                if (array_get($options, $k) !== $v) {
+                    continue 2;
+                }
+            }
+            $options = array_merge($optionSet['options'], $options);
+        }
+
+        $options = $this->getOptionResolver()->resolve($options);
+
+        if (filled($this->postBuildCallbacks)) {
+            foreach ($this->postBuildCallbacks as $buildCallback) {
+                $options = call_user_func($buildCallback, $options) ?? $options;
+            }
+        }
+
         if (isset($this->optionsCallback)) {
             $options = call_user_func($this->optionsCallback, $options) ?? $options;
         }
@@ -115,7 +138,7 @@ class Builder
      */
     public function getStoreOptions(): ?array
     {
-        return $this->store;
+        return $this->options['store'] ?? [];
     }
 
     public function name(string $name)
@@ -128,15 +151,15 @@ class Builder
      * @param \Sayla\Objects\ObjectDispatcher $objectDispatcher
      * @return $this
      */
-    public function objectDispatcher(\Sayla\Objects\ObjectDispatcher $objectDispatcher)
+    public function objectDispatcher(ObjectDispatcher $objectDispatcher)
     {
         $this->options[__FUNCTION__] = $objectDispatcher;
         return $this;
     }
 
-    public function onBuild(callable $callback)
+    public function onAddDataType(callable $callback)
     {
-        $this->buildCallbacks[] = $callback;
+        $this->onAddDataTypeCallbacks[] = $callback;
         return $this;
     }
 
@@ -146,28 +169,28 @@ class Builder
         return $this;
     }
 
+    public function runAddDataType(DataType $dataType)
+    {
+        foreach ($this->onAddDataTypeCallbacks as $callback)
+            call_user_func($callback, $dataType);
+        return $this;
+    }
+
     /**
-     * @param \Sayla\Objects\Contract\PropertyType[]|PropertyTypeSet $propertyTypes
+     * @param callable $callable
      * @return $this
      */
-    public function propertyTypes(PropertyTypeSet $propertyTypes)
+    public function runCallback(callable $callable)
     {
-        $this->options[__FUNCTION__] = $propertyTypes;
+        call_user_func($callable, $this, $this->options['objectClass']);
         return $this;
     }
 
     public function store(string $driver, array $options = [], string $storeName = null)
     {
-        $storeName = $storeName ?? $this->options['name'] ?? $this->options['objectClass'];
-        $this->options['storeName'] = $storeName;
-        if (!isset($this->dataTypeClass)) {
-            $this->setDataTypeClass(StoringDataType::class);
-        }
-        $this->store = [
-            'name' => $storeName,
-            'options' => $options,
-            'driver' => $driver,
-        ];
+        $options['name'] = $storeName ?? $this->getName();
+        $options['driver'] = $driver;
+        $this->options['store'] = $options;
         return $this;
     }
 
@@ -185,7 +208,27 @@ class Builder
     {
         if (!isset($this->optionsResolver)) {
             $resolver = new OptionsResolver();
-            forward_static_call($this->getDataTypeClass() . '::configureOptions', $resolver);
+            $resolver->setRequired(['objectClass', 'attributes']);
+
+            $resolver->setAllowedTypes('objectClass', 'string');
+            $resolver->setAllowedTypes('attributes', 'array');
+
+            $resolver->setDefined('store');
+            $resolver->setAllowedTypes('store', 'array');
+
+            $resolver->setDefault('classFile', null);
+            $resolver->setAllowedTypes('classFile', ['string', 'null']);
+
+            $resolver->setDefaults(['traits' => []]);
+            $resolver->setAllowedTypes('traits', 'array');
+
+            $resolver->setDefaults(['interfaces' => []]);
+            $resolver->setAllowedTypes('interfaces', 'array');
+
+            $resolver->setDefault('name', function (Options $options) {
+                return $options['objectClass'];
+            });
+            $resolver->setAllowedTypes('name', 'string');
             $this->optionsResolver = $resolver;
         }
         return $this->optionsResolver;

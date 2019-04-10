@@ -2,6 +2,7 @@
 
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Contracts\Support\Jsonable;
+use JsonSerializable;
 use Sayla\Data\DotArrayObject;
 use Sayla\Objects\Transformers\ValueTransformer;
 use Sayla\Objects\Transformers\ValueTransformerTrait;
@@ -28,32 +29,6 @@ class JsonTransformer implements ValueTransformer
         return new $class($constructorValue);
     }
 
-    public function getScalarType(): string
-    {
-        return 'string';
-    }
-
-    /**
-     * @param mixed $value
-     * @return string
-     */
-    public function smash($value)
-    {
-        $output = $value;
-        if ($output instanceof Jsonable) {
-            $output = $output->toJson();
-        } elseif ($output instanceof \JsonSerializable) {
-            $output = JsonHelper::encode($output);
-        } elseif ($output instanceof Arrayable) {
-            $output = JsonHelper::encode($output->toArray());
-        } elseif ($value == '' || $value === null) {
-            $output = '{}';
-        } elseif (!is_string($value)) {
-            $output = JsonHelper::encode($output ?: []);
-        }
-        return $output;
-    }
-
     /**
      * @param $value
      * @return mixed
@@ -72,5 +47,31 @@ class JsonTransformer implements ValueTransformer
             $constructorValue = $value;
         }
         return $constructorValue;
+    }
+
+    public function getScalarType(): string
+    {
+        return 'string';
+    }
+
+    /**
+     * @param mixed $value
+     * @return string
+     */
+    public function smash($value)
+    {
+        $output = $value;
+        if ($output instanceof Jsonable) {
+            $output = $output->toJson();
+        } elseif ($output instanceof JsonSerializable) {
+            $output = JsonHelper::encode($output);
+        } elseif ($output instanceof Arrayable) {
+            $output = JsonHelper::encode($output->toArray());
+        } elseif ($value == '' || $value === null) {
+            $output = '{}';
+        } elseif (!is_string($value)) {
+            $output = JsonHelper::encode($output ?: []);
+        }
+        return $output;
     }
 }

@@ -2,12 +2,14 @@
 
 namespace Sayla\Objects\DataType;
 
+use Illuminate\Contracts\Events\Dispatcher;
 use Sayla\Objects\ObjectCollection;
 use Sayla\Objects\ObjectDispatcher;
 use Sayla\Objects\SimpleEventDispatcher;
 use Sayla\Util\Mixin\MixinSet;
+use Serializable;
 
-class DataTypeDescriptor implements \Serializable
+class DataTypeDescriptor implements Serializable
 {
     /** @var \Sayla\Util\Mixin\MixinSet */
     protected $mixins;
@@ -19,19 +21,19 @@ class DataTypeDescriptor implements \Serializable
     private $attributeNames = [];
     /** @var string */
     private $class;
-    /** @var string */
-    private $dataType;
     /** @var \Illuminate\Contracts\Events\Dispatcher */
     private $eventDispatcher;
     /** @var \Illuminate\Support\Collection|\Sayla\Objects\Contract\Property[] */
     private $getFilters = [];
+    /** @var string */
+    private $name;
     /** @var \Illuminate\Support\Collection|\Sayla\Objects\Contract\Property[] */
     private $setFilters = [];
 
     /**
      * DataTypeDescriptor constructor.
      * @param \Sayla\Objects\ObjectDispatcher $eventDispatcher
-     * @param string $class
+     * @param string $name
      * @param string $dataType
      * @param array $resolvable
      * @param array $attributeNames
@@ -41,13 +43,13 @@ class DataTypeDescriptor implements \Serializable
      * @param callable[] $setFilters
      * @param callable[] $getFilters
      */
-    public function __construct(string $class, string $dataType, array $attributeNames,
+    public function __construct(string $name, string $class, array $attributeNames,
                                 MixinSet $mixins = null,
                                 array $setFilters = [],
                                 array $getFilters = [])
     {
         $this->class = $class;
-        $this->dataType = $dataType;
+        $this->name = $name;
         $this->attributeNames = array_combine($attributeNames, $attributeNames);
         $this->setFilters = $setFilters;
         $this->getFilters = $getFilters;
@@ -62,9 +64,9 @@ class DataTypeDescriptor implements \Serializable
     /**
      * @return \Sayla\Objects\ObjectDispatcher
      */
-    public function dispatcher(): \Sayla\Objects\ObjectDispatcher
+    public function dispatcher(): ObjectDispatcher
     {
-        return new ObjectDispatcher($this->getEventDispatcher(), $this->dataType);
+        return new ObjectDispatcher($this->getEventDispatcher(), $this->name);
     }
 
     public function getAttributeNames()
@@ -74,15 +76,15 @@ class DataTypeDescriptor implements \Serializable
 
     public function getDataType(): string
     {
-        return $this->dataType;
+        return $this->name;
     }
 
-    protected function getEventDispatcher(): \Illuminate\Contracts\Events\Dispatcher
+    protected function getEventDispatcher(): Dispatcher
     {
         return $this->eventDispatcher ?? ($this->eventDispatcher = new SimpleEventDispatcher());
     }
 
-    public function setEventDispatcher(\Illuminate\Contracts\Events\Dispatcher $eventDispatcher): void
+    public function setEventDispatcher(Dispatcher $eventDispatcher): void
     {
         $this->eventDispatcher = $eventDispatcher;
     }
@@ -94,7 +96,23 @@ class DataTypeDescriptor implements \Serializable
 
     public function getMixin(string $name)
     {
-        return $this->mixins[$name];
+        return $this->mixins[$name] ?? $this->mixins[class_basename($name)];
+    }
+
+    /**
+     * @return \Sayla\Util\Mixin\MixinSet
+     */
+    public function getMixins(): MixinSet
+    {
+        return $this->mixins;
+    }
+
+    /**
+     * @param \Sayla\Util\Mixin\MixinSet $mixins
+     */
+    public function setMixins(MixinSet $mixins): void
+    {
+        $this->mixins = $mixins;
     }
 
     public function getObjectClass(): string
@@ -107,10 +125,10 @@ class DataTypeDescriptor implements \Serializable
         return $this->setFilters[$attributeName] ?? [];
     }
 
-    public function hasMixin(string $mixinClass)
+    public function hasMixin(string $mixinClassOrName)
     {
-        foreach ($this->mixins as $mixin)
-            if (is_a($mixin, $mixinClass)) {
+        foreach ($this->mixins as $mixinName => $mixin)
+            if ($mixinName === $mixinClassOrName || is_a($mixin, $mixinClassOrName)) {
                 return true;
             }
         return false;
@@ -121,7 +139,7 @@ class DataTypeDescriptor implements \Serializable
      */
     public function newCollection(): ObjectCollection
     {
-        return $this->objectCollectionClass::makeObjectCollection($this->dataType, false, false);
+        return $this->objectCollectionClass::makeObjectCollection($this->name, false, false);
     }
 
     public function serialize()
@@ -129,20 +147,12 @@ class DataTypeDescriptor implements \Serializable
         $props = [
             'attributeNames' => $this->attributeNames,
             'class' => $this->class,
-            'dataType' => $this->dataType,
+            'dataType' => $this->name,
             'getFilters' => $this->getFilters,
             'setFilters' => $this->setFilters,
             'mixins' => $this->mixins
         ];
         return serialize($props);
-    }
-
-    /**
-     * @param \Sayla\Util\Mixin\MixinSet $mixins
-     */
-    public function setMixins(\Sayla\Util\Mixin\MixinSet $mixins): void
-    {
-        $this->mixins = $mixins;
     }
 
     /**
@@ -158,7 +168,7 @@ class DataTypeDescriptor implements \Serializable
         $props = unserialize($serialized);
         $this->attributeNames = $props['attributeNames'];
         $this->class = $props['class'];
-        $this->dataType = $props['dataType'];
+        $this->name = $props['dataType'];
         $this->getFilters = $props['getFilters'];
         $this->setFilters = $props['setFilters'];
         $this->mixins = $props['mixins'];

@@ -24,16 +24,6 @@ class SlugTransformer implements ValueTransformer
     }
 
     /**
-     * @param mixed $value
-     * @return string|null
-     */
-    public function smash($value)
-    {
-        $separator = $this->options->get('separator', '-');
-        return $this->makeSlug($value, $separator);
-    }
-
-    /**
      * @param $value
      * @param $separator
      * @return null|string
@@ -41,5 +31,15 @@ class SlugTransformer implements ValueTransformer
     protected function makeSlug($value, $separator)
     {
         return empty($value) ? null : Str::slug($value, $separator);
+    }
+
+    /**
+     * @param mixed $value
+     * @return string|null
+     */
+    public function smash($value)
+    {
+        $separator = $this->options->get('separator', '-');
+        return $this->makeSlug($value, $separator);
     }
 }

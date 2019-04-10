@@ -2,14 +2,16 @@
 
 namespace Sayla\Objects\Stores\FileStore;
 
+use Illuminate\Filesystem\Filesystem;
 use Saybol\Support\FileRepo\JsonFileRepository;
 use Saybol\Support\FileRepo\PhpFileRepository;
 use Saybol\Support\FileRepo\YamlFileRepository;
 use Sayla\Objects\Contract\ConfigurableStore;
 use Sayla\Objects\Contract\ObjectStore;
-use Sayla\Objects\DataModel;
+use Sayla\Objects\StorableTrait;
 use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use UnexpectedValueException;
 
 class FileRepoStore implements ObjectStore, ConfigurableStore
 {
@@ -42,7 +44,7 @@ class FileRepoStore implements ObjectStore, ConfigurableStore
      * SerialStore constructor.
      * @param $data
      */
-    public function __construct(\Illuminate\Filesystem\Filesystem $files)
+    public function __construct(Filesystem $files)
     {
         $this->files = $files;
     }
@@ -64,7 +66,7 @@ class FileRepoStore implements ObjectStore, ConfigurableStore
         $resolver->setAllowedValues('fileType', self::FILE_TYPES);
     }
 
-    public function create(DataModel $object): iterable
+    public function create(Storable  $object): iterable
     {
         $dataType = $object->dataType();
         $data = $object->toArray();
@@ -74,7 +76,7 @@ class FileRepoStore implements ObjectStore, ConfigurableStore
             $key = $object[$this->primaryKey];
         }
         if (empty($key)) {
-            throw new \UnexpectedValueException('Key can not be null');
+            throw new UnexpectedValueException('Key can not be null');
         }
         $data[$this->primaryKey] = $key;
         $this->store->getData()->get('models')->set($key, $data);
@@ -82,7 +84,7 @@ class FileRepoStore implements ObjectStore, ConfigurableStore
         return $dataType->hydrateData($data);
     }
 
-    public function delete(DataModel $object): iterable
+    public function delete(Storable  $object): iterable
     {
         $this->store->getData()->get('models')->forget($object->getKey());
         $this->store->save();
@@ -92,18 +94,6 @@ class FileRepoStore implements ObjectStore, ConfigurableStore
     public function findModel($key)
     {
         return $this->store->getEntry($key, 'models');
-    }
-
-    /**
-     * @return \Sayla\Objects\Stores\FileStore\ObjectCollectionLookup
-     */
-    public function lookup()
-    {
-        return new ObjectCollectionLookup(
-            $this->name,
-            $this->getPrimaryKey()  ,
-            $this->store->getGroupArray('models')
-        );
     }
 
     /**
@@ -128,6 +118,18 @@ class FileRepoStore implements ObjectStore, ConfigurableStore
     public function isPrimaryKeyIncrements(): bool
     {
         return $this->primaryKeyIncrements;
+    }
+
+    /**
+     * @return \Sayla\Objects\Stores\FileStore\ObjectCollectionLookup
+     */
+    public function lookup()
+    {
+        return new ObjectCollectionLookup(
+            $this->name,
+            $this->getPrimaryKey(),
+            $this->store->getGroupArray('models')
+        );
     }
 
     public function setOptions(string $name, array $options): void
@@ -162,7 +164,7 @@ class FileRepoStore implements ObjectStore, ConfigurableStore
         return 'FileRepo[' . $this->name . ']';
     }
 
-    public function update(DataModel $object): iterable
+    public function update(Storable  $object): iterable
     {
         $dataType = $object->dataType();
         $data = $object->toArray();

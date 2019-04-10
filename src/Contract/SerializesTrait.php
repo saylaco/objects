@@ -13,7 +13,7 @@ trait SerializesTrait
             if (is_string($property)) {
                 unset($properties[$property]);
             } elseif (is_callable($property)) {
-                $propertiesToIgnore = (array) $property($properties);
+                $propertiesToIgnore = (array)$property($properties);
                 array_forget($properties, $propertiesToIgnore);
             }
         }

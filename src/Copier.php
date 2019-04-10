@@ -17,22 +17,15 @@ class Copier
      * DataObjectCopier constructor.
      * @param $copier
      */
-    public function __construct(\DeepCopy\DeepCopy $copier = null)
+    public function __construct(DeepCopy $copier = null)
     {
         $this->copier = $copier ?? $this->makeCopier();
     }
 
-    /**
-     * @return \DeepCopy\DeepCopy
-     */
-    protected function makeCopier(): \DeepCopy\DeepCopy
+    public function copyAttributes(Attributable $object): array
     {
-        $copier = new DeepCopy();
-        $copier->skipUncloneable(true);
-        $copier->addTypeFilter(new ReplaceFilter(function ($value) {
-            return $this->copyObject($value);
-        }), new TypeMatcher(Attributable::class));
-        return $copier;
+        $simpleObject = $this->copier->copy(new SimpleObject($object->toArray()));
+        return (array)$simpleObject;
     }
 
     public function copyObject(Attributable $object): Attributable
@@ -42,9 +35,16 @@ class Copier
         return new $className($data);
     }
 
-    public function copyAttributes(Attributable $object): array
+    /**
+     * @return \DeepCopy\DeepCopy
+     */
+    protected function makeCopier(): DeepCopy
     {
-        $simpleObject = $this->copier->copy(new SimpleObject($object->toArray()));
-        return (array)$simpleObject;
+        $copier = new DeepCopy();
+        $copier->skipUncloneable(true);
+        $copier->addTypeFilter(new ReplaceFilter(function ($value) {
+            return $this->copyObject($value);
+        }), new TypeMatcher(Attributable::class));
+        return $copier;
     }
 }

@@ -22,15 +22,6 @@ class DatabaseKeyTransformer implements ValueTransformer
     }
 
     /**
-     * @param mixed $value
-     * @return string|null
-     */
-    public function smash($value)
-    {
-        return is_null($value) ? null : $this->getTypedValue($value, $this->options->get('varType'));
-    }
-
-    /**
      * @param $value
      * @param $varType
      * @return int|string
@@ -41,5 +32,14 @@ class DatabaseKeyTransformer implements ValueTransformer
             return strval($value);
         }
         return intval($value);
+    }
+
+    /**
+     * @param mixed $value
+     * @return string|null
+     */
+    public function smash($value)
+    {
+        return is_null($value) ? null : $this->getTypedValue($value, $this->options->get('varType'));
     }
 }

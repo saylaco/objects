@@ -3,7 +3,7 @@
 namespace Sayla\Objects\Stores;
 
 use Sayla\Objects\Contract\ObjectStore;
-use Sayla\Objects\DataModel;
+use Sayla\Objects\Contract\Storable;
 
 class StorageAggregate implements ObjectStore
 {
@@ -18,18 +18,18 @@ class StorageAggregate implements ObjectStore
     }
 
     /**
-     * @param \Sayla\Objects\DataModel $object
+     * @param Storable $object
      */
-    public function create(DataModel $object)
+    public function create(Storable $object)
     {
         foreach ($this->strategies as $strategy)
             $strategy->create($object);
     }
 
     /**
-     * @param \Sayla\Objects\DataModel $object
+     * @param Storable $object
      */
-    public function delete(DataModel $object)
+    public function delete(Storable $object)
     {
         foreach ($this->strategies as $strategy)
             $strategy->delete($object);
@@ -41,9 +41,9 @@ class StorageAggregate implements ObjectStore
     }
 
     /**
-     * @param \Sayla\Objects\DataModel $object
+     * @param Storable $object
      */
-    public function update(DataModel $object)
+    public function update(Storable $object)
     {
         foreach ($this->strategies as $strategy)
             $strategy->update($object);

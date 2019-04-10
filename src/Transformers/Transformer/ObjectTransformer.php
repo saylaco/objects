@@ -5,10 +5,10 @@ namespace Sayla\Objects\Transformers\Transformer;
 use Sayla\Objects\AttributableObject;
 use Sayla\Objects\Contract\SupportsDataTypeManager;
 use Sayla\Objects\Contract\SupportsDataTypeManagerTrait;
-use Sayla\Objects\Transformers\ValueTransformer;
+use Sayla\Objects\Transformers\AttributeValueTransformer;
 use Sayla\Objects\Transformers\ValueTransformerTrait;
 
-class ObjectTransformer implements ValueTransformer, SupportsDataTypeManager
+class ObjectTransformer implements AttributeValueTransformer, SupportsDataTypeManager
 {
     use ValueTransformerTrait;
     use SupportsDataTypeManagerTrait;
@@ -30,13 +30,30 @@ class ObjectTransformer implements ValueTransformer, SupportsDataTypeManager
             return null;
         }
         $attributes = $value ?? [];
-        $dataType = $this->options->dataType ?? $this->options->class;
+        $dataType = $this->getDataType();
         return self::getDataTypeManager()->get($dataType)->hydrate($attributes);
+    }
+
+    /**
+     * @return mixed|null
+     */
+    protected function getDataType()
+    {
+        return $this->options->dataType ?? $this->options->class;
     }
 
     public function getScalarType(): ?string
     {
         return 'array';
+    }
+
+    public function getVarType(): string
+    {
+        $dataType = $this->getDataType();
+        if (!class_exists($dataType)) {
+            return $this->options->class ?: self::getDataTypeManager()->get($dataType)->getObjectClass();
+        }
+        return $dataType;
     }
 
     /**

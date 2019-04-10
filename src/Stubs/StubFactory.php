@@ -17,20 +17,18 @@ class StubFactory implements ArrayAccess
      * @var array
      */
     protected $definitions = [];
-
-    /**
-     * The registered model states.
-     *
-     * @var array
-     */
-    protected $states = [];
-
     /**
      * The Faker instance for the builder.
      *
      * @var \Faker\Generator
      */
     protected $faker;
+    /**
+     * The registered model states.
+     *
+     * @var array
+     */
+    protected $states = [];
     /**
      * @var \Sayla\Objects\DataType\DataTypeManager
      */
@@ -39,7 +37,7 @@ class StubFactory implements ArrayAccess
     /**
      * Create a new factory instance.
      *
-     * @param  \Faker\Generator $faker
+     * @param \Faker\Generator $faker
      */
     public function __construct(Faker $faker, DataTypeManager $dataTypeManager)
     {
@@ -48,14 +46,6 @@ class StubFactory implements ArrayAccess
             self::setInstance($this);
         }
         $this->dataTypeManager = $dataTypeManager;
-    }
-
-    /**
-     * @return bool
-     */
-    public static function hasInstance(): bool
-    {
-        return isset(self::$instance);
     }
 
     /**
@@ -75,10 +65,18 @@ class StubFactory implements ArrayAccess
     }
 
     /**
+     * @return bool
+     */
+    public static function hasInstance(): bool
+    {
+        return isset(self::$instance);
+    }
+
+    /**
      * Create an instance of the given model and persist it to the database.
      *
-     * @param  string $class
-     * @param  array $attributes
+     * @param string $class
+     * @param array $attributes
      * @return mixed
      */
     public function create($class, array $attributes = [])
@@ -87,23 +85,11 @@ class StubFactory implements ArrayAccess
     }
 
     /**
-     * Create a builder for the given model.
-     *
-     * @param  string $class
-     * @param  string $name
-     * @return \Sayla\Objects\Stubs\StubBuilder
-     */
-    public function of($class, $name = 'default')
-    {
-        return new StubBuilder($class, $name, $this->definitions, $this->states, $this->faker, $this->dataTypeManager);
-    }
-
-    /**
      * Create an instance of the given model and type and persist it to the database.
      *
-     * @param  string $class
-     * @param  string $name
-     * @param  array $attributes
+     * @param string $class
+     * @param string $name
+     * @param array $attributes
      * @return mixed
      */
     public function createAs($class, $name, array $attributes = [])
@@ -112,24 +98,11 @@ class StubFactory implements ArrayAccess
     }
 
     /**
-     * Define a class with a given short-name.
-     *
-     * @param  string $class
-     * @param  string $name
-     * @param  callable $attributes
-     * @return $this
-     */
-    public function defineAs($class, $name, callable $attributes)
-    {
-        return $this->define($class, $attributes, $name);
-    }
-
-    /**
      * Define a class with a given set of attributes.
      *
-     * @param  string $class
-     * @param  callable $attributes
-     * @param  string $name
+     * @param string $class
+     * @param callable $attributes
+     * @param string $name
      * @return $this
      */
     public function define($class, callable $attributes, $name = 'default')
@@ -140,9 +113,22 @@ class StubFactory implements ArrayAccess
     }
 
     /**
+     * Define a class with a given short-name.
+     *
+     * @param string $class
+     * @param string $name
+     * @param callable $attributes
+     * @return $this
+     */
+    public function defineAs($class, $name, callable $attributes)
+    {
+        return $this->define($class, $attributes, $name);
+    }
+
+    /**
      * Load factories from path.
      *
-     * @param  string $path
+     * @param string $path
      * @return $this
      */
     public function load($path)
@@ -159,11 +145,23 @@ class StubFactory implements ArrayAccess
     }
 
     /**
+     * Create an instance of the given model.
+     *
+     * @param string $class
+     * @param array $attributes
+     * @return mixed
+     */
+    public function make($class, array $attributes = [])
+    {
+        return $this->of($class)->make($attributes);
+    }
+
+    /**
      * Create an instance of the given model and type.
      *
-     * @param  string $class
-     * @param  string $name
-     * @param  array $attributes
+     * @param string $class
+     * @param string $name
+     * @param array $attributes
      * @return mixed
      */
     public function makeAs($class, $name, array $attributes = [])
@@ -172,9 +170,21 @@ class StubFactory implements ArrayAccess
     }
 
     /**
+     * Create a builder for the given model.
+     *
+     * @param string $class
+     * @param string $name
+     * @return \Sayla\Objects\Stubs\StubBuilder
+     */
+    public function of($class, $name = 'default')
+    {
+        return new StubBuilder($class, $name, $this->definitions, $this->states, $this->faker, $this->dataTypeManager);
+    }
+
+    /**
      * Determine if the given offset exists.
      *
-     * @param  string $offset
+     * @param string $offset
      * @return bool
      */
     public function offsetExists($offset)
@@ -185,7 +195,7 @@ class StubFactory implements ArrayAccess
     /**
      * Get the value of the given offset.
      *
-     * @param  string $offset
+     * @param string $offset
      * @return mixed
      */
     public function offsetGet($offset)
@@ -196,8 +206,8 @@ class StubFactory implements ArrayAccess
     /**
      * Set the given offset to the given value.
      *
-     * @param  string $offset
-     * @param  callable $value
+     * @param string $offset
+     * @param callable $value
      * @return void
      */
     public function offsetSet($offset, $value)
@@ -208,7 +218,7 @@ class StubFactory implements ArrayAccess
     /**
      * Unset the value at the given offset.
      *
-     * @param  string $offset
+     * @param string $offset
      * @return void
      */
     public function offsetUnset($offset)
@@ -217,36 +227,11 @@ class StubFactory implements ArrayAccess
     }
 
     /**
-     * Create an instance of the given model.
-     *
-     * @param  string $class
-     * @param  array $attributes
-     * @return mixed
-     */
-    public function make($class, array $attributes = [])
-    {
-        return $this->of($class)->make($attributes);
-    }
-
-    /**
-     * Get the raw attribute array for a given named model.
-     *
-     * @param  string $class
-     * @param  string $name
-     * @param  array $attributes
-     * @return array
-     */
-    public function rawOf($class, $name, array $attributes = [])
-    {
-        return $this->raw($class, $attributes, $name);
-    }
-
-    /**
      * Get the raw attribute array for a given model.
      *
-     * @param  string $class
-     * @param  array $attributes
-     * @param  string $name
+     * @param string $class
+     * @param array $attributes
+     * @param string $name
      * @return array
      */
     public function raw($class, array $attributes = [], $name = 'default')
@@ -257,11 +242,24 @@ class StubFactory implements ArrayAccess
     }
 
     /**
+     * Get the raw attribute array for a given named model.
+     *
+     * @param string $class
+     * @param string $name
+     * @param array $attributes
+     * @return array
+     */
+    public function rawOf($class, $name, array $attributes = [])
+    {
+        return $this->raw($class, $attributes, $name);
+    }
+
+    /**
      * Define a state with a given set of attributes.
      *
-     * @param  string $class
-     * @param  string $state
-     * @param  callable $attributes
+     * @param string $class
+     * @param string $state
+     * @param callable $attributes
      * @return $this
      */
     public function state($class, $state, callable $attributes)

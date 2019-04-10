@@ -31,7 +31,7 @@ class ObjectCollectionLookup
     }
 
     /**
-     * @return \Sayla\Objects\ObjectCollection|\Sayla\Objects\DataModel[]
+     * @return \Sayla\Objects\ObjectCollection|\Sayla\Objects\StorableTrait[]
      */
     public function all()
     {
@@ -47,7 +47,7 @@ class ObjectCollectionLookup
 
     /**
      * @param $key
-     * @return \Sayla\Objects\DataModel
+     * @return \Sayla\Objects\StorableTrait
      */
     public function find($key)
     {
@@ -57,7 +57,7 @@ class ObjectCollectionLookup
     /**
      * @param $attribute
      * @param $key
-     * @return \Sayla\Objects\DataModel
+     * @return \Sayla\Objects\StorableTrait
      */
     public function findBy($attribute, $key)
     {

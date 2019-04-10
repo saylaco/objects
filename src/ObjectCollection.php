@@ -14,6 +14,7 @@ use Sayla\Objects\DataType\DataTypeManager;
  */
 class ObjectCollection extends Collection
 {
+    protected static $enforceItemType = true;
     protected $allowNullItems = false;
     protected $dataType = DataObject::class;
     protected $keyAttribute;
@@ -36,6 +37,13 @@ class ObjectCollection extends Collection
         return $collection;
     }
 
+    /**
+     * @param bool $enforceItemType
+     */
+    public static function setEnforceItemType(bool $enforceItemType): void
+    {
+        self::$enforceItemType = $enforceItemType;
+    }
 
     /**
      * @param $items
@@ -128,7 +136,7 @@ class ObjectCollection extends Collection
     /**
      * Get an item at a given offset.
      *
-     * @param  mixed $key
+     * @param mixed $key
      * @return mixed|null|Object
      */
     public function offsetGet($key): ?DataObject
@@ -139,8 +147,8 @@ class ObjectCollection extends Collection
     /**
      * Set the item at a given offset.
      *
-     * @param  mixed $key
-     * @param  mixed $value
+     * @param mixed $key
+     * @param mixed $value
      * @return void
      */
     public function offsetSet($key, $value)
@@ -209,15 +217,21 @@ class ObjectCollection extends Collection
         }
     }
 
+    /**
+     * @param \Sayla\Objects\DataObject|mixed $value
+     */
     protected function validateItemType($value)
     {
         if ($this->allowNullItems && $value === null) {
             return;
         }
+        if (!self::$enforceItemType) {
+            return null;
+        }
         $itemDescriptor = $this->getItemDescriptor();
         if (!is_a($value, $itemDescriptor->getObjectClass())
             && !is_subclass_of($value, $itemDescriptor->getObjectClass())
-            && ($value->getDataType() != $itemDescriptor->getDataType())
+            && ($value->dataTypeName() != $itemDescriptor->getDataType())
             && (get_class($value) != $itemDescriptor->getObjectClass())
         ) {
             throw new InvalidValue("An item must a '{$this->dataType}' object");

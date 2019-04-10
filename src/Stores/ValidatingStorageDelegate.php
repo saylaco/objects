@@ -10,14 +10,14 @@ use Sayla\Objects\Validation\ValidationDescriptor;
 class ValidatingStorageDelegate implements ObjectStore
 {
     /**
-     * @var ObjectStore
-     */
-    private $strategy;
-    /**
      * @var \Sayla\Objects\Validation\ValidationDescriptor
      */
     private $descriptor;
     private $properties = [];
+    /**
+     * @var ObjectStore
+     */
+    private $strategy;
 
     /**
      * ObjectStore constructor.
@@ -51,48 +51,6 @@ class ValidatingStorageDelegate implements ObjectStore
         $this->strategy->delete($object);
     }
 
-    public function toStoreString($name, $arguments): string
-    {
-        return 'Validating(' . $this->strategy->toStoreString() . ')';
-    }
-
-    /**
-     * @param \Sayla\Objects\DataObject $object
-     */
-    public function update(DataObject $object)
-    {
-        $object('beforeValidation');
-        $object('beforeUpdateValidation');
-        $this->validateModification($object);
-        $this->strategy->update($object);
-    }
-
-    protected function performCreate(DataObject $object)
-    {
-        $object('beforeValidation');
-        $object('beforeCreateValidation');
-        $this->validateCreation($object);
-        $this->strategy->create($object);
-    }
-
-    public function validateCreation(DataObject $object): void
-    {
-        $this->getValidationBuilder()
-            ->setRules($this->getCreateRules())
-            ->validate($object->toArray());
-    }
-
-    /**
-     * @return ValidationBuilder
-     */
-    public function getValidationBuilder()
-    {
-        $builder = (new ValidationBuilder($this->descriptor->getName(), $this->properties))
-            ->setMessages($this->descriptor->messages)
-            ->setCustomAttributes($this->descriptor->labels);
-        return $builder;
-    }
-
     /**
      * @return array
      */
@@ -101,34 +59,12 @@ class ValidatingStorageDelegate implements ObjectStore
         return array_merge_recursive($this->descriptor->rules, $this->descriptor->createRules);
     }
 
-    public function validateDeletion(DataObject $object): void
-    {
-        $this->getValidationBuilder()
-            ->setRules($this->getDeleteRules())
-            ->validate($object->toArray());
-    }
-
     /**
      * @return array
      */
     protected function getDeleteRules(): array
     {
         return array_merge_recursive($this->descriptor->rules, $this->descriptor->deleteRules);
-    }
-
-    public function validateModification(DataObject $object): void
-    {
-        $this->getValidationBuilder()
-            ->setRules($this->getUpdateRules())
-            ->validate($object->toArray());
-    }
-
-    /**
-     * @return array
-     */
-    protected function getUpdateRules(): array
-    {
-        return array_merge_recursive($this->descriptor->rules, $this->descriptor->updateRules);
     }
 
     public function getProperties(): array
@@ -147,14 +83,78 @@ class ValidatingStorageDelegate implements ObjectStore
         return $this->strategy;
     }
 
+    /**
+     * @return array
+     */
+    protected function getUpdateRules(): array
+    {
+        return array_merge_recursive($this->descriptor->rules, $this->descriptor->updateRules);
+    }
+
+    /**
+     * @return ValidationBuilder
+     */
+    public function getValidationBuilder()
+    {
+        $builder = (new ValidationBuilder($this->descriptor->getName(), $this->properties))
+            ->setMessages($this->descriptor->messages)
+            ->setCustomAttributes($this->descriptor->labels);
+        return $builder;
+    }
+
     protected function getValidationDescriptor(): ValidationDescriptor
     {
         return $this->descriptor;
+    }
+
+    protected function performCreate(DataObject $object)
+    {
+        $object('beforeValidation');
+        $object('beforeCreateValidation');
+        $this->validateCreation($object);
+        $this->strategy->create($object);
     }
 
     public function setProperty($key, $value)
     {
         $this->properties[$key] = $value;
         return $this;
+    }
+
+    public function toStoreString($name, $arguments): string
+    {
+        return 'Validating(' . $this->strategy->toStoreString() . ')';
+    }
+
+    /**
+     * @param \Sayla\Objects\DataObject $object
+     */
+    public function update(DataObject $object)
+    {
+        $object('beforeValidation');
+        $object('beforeUpdateValidation');
+        $this->validateModification($object);
+        $this->strategy->update($object);
+    }
+
+    public function validateCreation(DataObject $object): void
+    {
+        $this->getValidationBuilder()
+            ->setRules($this->getCreateRules())
+            ->validate($object->toArray());
+    }
+
+    public function validateDeletion(DataObject $object): void
+    {
+        $this->getValidationBuilder()
+            ->setRules($this->getDeleteRules())
+            ->validate($object->toArray());
+    }
+
+    public function validateModification(DataObject $object): void
+    {
+        $this->getValidationBuilder()
+            ->setRules($this->getUpdateRules())
+            ->validate($object->toArray());
     }
 }

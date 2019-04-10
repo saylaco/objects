@@ -19,14 +19,14 @@ class ObjectsBindings extends BindingProvider
         return [
             'storeManager' => [
                 StoreManager::class,
-                function () {
-                    return StoreManager::getInstance();
+                function ($container) {
+                    return $container->get(DataTypeManager::class)->getStoreManager();
                 }
             ],
             'dataTypeManager' => [
                 DataTypeManager::class,
-                function () {
-                    return DataTypeManager::getInstance();
+                function ($container) {
+                    return new DataTypeManager(new StoreManager($container));
                 }
             ],
             'transformerValues' => [

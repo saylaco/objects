@@ -9,16 +9,16 @@ class ResolverDelegate implements AttributeResolver
 {
     /** @var string */
     protected $attributeName;
+    /**
+     * @var \Sayla\Objects\Contract\AttributeResolver
+     */
+    protected $multipleValueResolver;
     /** @var string */
     protected $owningObjectClass;
     /**
      * @var \Sayla\Objects\Contract\AttributeResolver
      */
     protected $singleValueResolver;
-    /**
-     * @var \Sayla\Objects\Contract\AttributeResolver
-     */
-    protected $multipleValueResolver;
 
     public function __construct(AttributeResolver $singleValueResolver, AttributeResolver $multipleValueResolver)
     {
