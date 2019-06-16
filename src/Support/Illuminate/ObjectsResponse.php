@@ -1,10 +1,12 @@
 <?php
 
-namespace Sayla\Objects;
+namespace Sayla\Objects\Support\Illuminate;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Sayla\Objects\Contract\DataObject\ResponsableObject;
+use Sayla\Objects\DataObject;
+use Sayla\Objects\ObjectCollection;
 
 class ObjectsResponse extends JsonResponse
 {

@@ -1,9 +1,8 @@
 <?php
 
-namespace Sayla\Objects\Contract\DataObject;
+namespace Sayla\Objects\Support\Illuminate;
 
 use Illuminate\Http\JsonResponse;
-use Sayla\Objects\ObjectsResponse;
 
 /**
  * @mixin \Sayla\Objects\DataObject
