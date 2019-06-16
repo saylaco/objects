@@ -48,7 +48,7 @@ class Transform implements AttributePropertyType
     /**
      * @param \ReflectionProperty $property
      * @return array|null
-     * @throws \Sayla\Objects\Exception\PropertyError
+     * @throws \Sayla\Objects\Contract\Exception\PropertyError
      */
     public function getPropertyValue(string $attributeName, array $value, string $attributeType): ?array
     {

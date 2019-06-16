@@ -121,7 +121,7 @@ class ObjectCollection extends Collection implements Responsable, Collectionable
     /**
      * @param $item
      * @return \Sayla\Objects\DataObject
-     * @throws \Sayla\Objects\Exception\HydrationError
+     * @throws \Sayla\Objects\Contract\Exception\HydrationError
      */
     protected function makeObject($item)
     {
@@ -189,7 +189,7 @@ class ObjectCollection extends Collection implements Responsable, Collectionable
     /**
      * @param array ...$attributes
      * @return static
-     * @throws \Sayla\Objects\Exception\AttributeResolverNotFound
+     * @throws \Sayla\Objects\Contract\Exception\AttributeResolverNotFound
      */
     public function resolve(...$attributes)
     {

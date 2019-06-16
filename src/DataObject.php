@@ -4,13 +4,13 @@ namespace Sayla\Objects;
 
 use Sayla\Objects\Contract\DataObject\SupportsDataTypeManager;
 use Sayla\Objects\Contract\DataObject\SupportsDataTypeManagerTrait;
+use Sayla\Objects\Contract\Exception\InaccessibleAttribute;
 use Sayla\Objects\Contract\IDataObject;
 use Sayla\Objects\Contract\Storable;
 use Sayla\Objects\Contract\Triggerable;
 use Sayla\Objects\Contract\TriggerableTrait;
 use Sayla\Objects\DataType\DataType;
 use Sayla\Objects\DataType\DataTypeDescriptor;
-use Sayla\Objects\Exception\InaccessibleAttribute;
 
 abstract class DataObject extends AttributableObject implements IDataObject, SupportsDataTypeManager, Triggerable
 {
@@ -129,7 +129,7 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
 
     /**
      * @return array
-     * @throws \Sayla\Objects\Exception\TransformationError
+     * @throws \Sayla\Objects\Contract\Exception\TransformationError
      */
     public function extract(): array
     {
@@ -316,7 +316,7 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
     /**
      * @param string $attributeName
      * @return mixed
-     * @throws \Sayla\Objects\Exception\AttributeResolverNotFound
+     * @throws \Sayla\Objects\Contract\Exception\AttributeResolverNotFound
      */
     protected function resolveAttributeValue(string $attributeName)
     {
@@ -369,7 +369,7 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
     /**
      * @param string $attributeName
      * @param $value
-     * @throws \Sayla\Objects\Exception\InaccessibleAttribute
+     * @throws \Sayla\Objects\Contract\Exception\InaccessibleAttribute
      */
     protected function setGuardedAttributeValue(string $attributeName, $value)
     {

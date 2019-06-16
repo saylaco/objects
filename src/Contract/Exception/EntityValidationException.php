@@ -1,6 +1,6 @@
 <?php
 
-namespace Sayla\Objects\Exception;
+namespace Sayla\Objects\Contract\Exception;
 
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Contracts\Validation\Validator;
@@ -23,7 +23,7 @@ class EntityValidationException extends ValidationException
     /**
      * @param \Illuminate\Contracts\Validation\Validator $validator
      * @param string $entityName
-     * @return \Illuminate\Contracts\Support\Responsable|\Sayla\Objects\Exception\EntityValidationException
+     * @return \Illuminate\Contracts\Support\Responsable|\Sayla\Objects\Contract\Exception\EntityValidationException
      */
     public static function make(Validator $validator, string $entityName)
     {

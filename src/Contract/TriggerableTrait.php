@@ -3,7 +3,7 @@
 namespace Sayla\Objects\Contract;
 
 use Closure;
-use Sayla\Objects\Exception\TriggerError;
+use Sayla\Objects\Contract\Exception\TriggerError;
 use Throwable;
 
 trait TriggerableTrait
@@ -31,7 +31,7 @@ trait TriggerableTrait
      * @param string $name name of trigger
      * @param mixed ...$args
      * @return mixed[]
-     * @throws \Sayla\Objects\Exception\TriggerError
+     * @throws \Sayla\Objects\Contract\Exception\TriggerError
      */
     public function __invoke(string $name, ...$args)
     {

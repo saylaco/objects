@@ -9,7 +9,7 @@ trait EloquentObjectTrait
 {
     /**
      * @return static[]
-     * @throws \Sayla\Objects\Exception\HydrationError
+     * @throws \Sayla\Objects\Contract\Exception\HydrationError
      */
     public static function all()
     {
@@ -28,7 +28,7 @@ trait EloquentObjectTrait
     /**
      * @param $id
      * @return static
-     * @throws \Sayla\Objects\Exception\HydrationError
+     * @throws \Sayla\Objects\Contract\Exception\HydrationError
      */
     public static function find($id)
     {
@@ -41,7 +41,7 @@ trait EloquentObjectTrait
     /**
      * @param $id
      * @return static
-     * @throws \Sayla\Objects\Exception\HydrationError
+     * @throws \Sayla\Objects\Contract\Exception\HydrationError
      */
     public static function findOrFail($id)
     {

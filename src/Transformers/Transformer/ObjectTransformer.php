@@ -17,7 +17,7 @@ class ObjectTransformer implements AttributeValueTransformer, SupportsDataTypeMa
     /**
      * @param mixed $value
      * @return mixed|null|\Sayla\Objects\DataObject
-     * @throws \Sayla\Objects\Exception\HydrationError
+     * @throws \Sayla\Objects\Contract\Exception\HydrationError
      */
     public function build($value)
     {

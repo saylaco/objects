@@ -19,7 +19,7 @@ class ObjectsResponse extends JsonResponse
      * @param int $status
      * @param array $headers
      * @param int $options
-     * @throws \Sayla\Objects\Exception\AttributeResolverNotFound
+     * @throws \Sayla\Objects\Contract\Exception\AttributeResolverNotFound
      */
     public function __construct(ObjectCollection $items, array $resolvableAttributes, $status = 200, $headers = [],
                                 $options = 0)
@@ -49,7 +49,7 @@ class ObjectsResponse extends JsonResponse
      * @param \Sayla\Objects\ObjectCollection $collection
      * @param $request
      * @return \Sayla\Objects\AttributableObject[]
-     * @throws \Sayla\Objects\Exception\AttributeResolverNotFound
+     * @throws \Sayla\Objects\Contract\Exception\AttributeResolverNotFound
      */
     public static function resolveObjectVisibleAttributesFromRequest(DataObject $obj, Request $request)
     {
@@ -71,7 +71,7 @@ class ObjectsResponse extends JsonResponse
      * @param \Sayla\Objects\ObjectCollection $collection
      * @param $request
      * @return \Sayla\Objects\AttributableObject[]|\Illuminate\Support\Collection
-     * @throws \Sayla\Objects\Exception\AttributeResolverNotFound
+     * @throws \Sayla\Objects\Contract\Exception\AttributeResolverNotFound
      */
     public static function resolveVisibleAttributes(ObjectCollection $collection, array $resolvableAttributes = [])
     {

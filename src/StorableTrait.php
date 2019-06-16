@@ -60,7 +60,7 @@ trait StorableTrait
     /**
      * @return $this
      * @throws \Sayla\Exception\Error
-     * @throws \Sayla\Objects\Exception\TriggerError
+     * @throws \Sayla\Objects\Contract\Exception\TriggerError
      */
     public function create()
     {
@@ -89,7 +89,7 @@ trait StorableTrait
     /**
      * @return \Sayla\Objects\StorableTrait
      * @throws \Sayla\Exception\Error
-     * @throws \Sayla\Objects\Exception\TriggerError
+     * @throws \Sayla\Objects\Contract\Exception\TriggerError
      */
     public function delete()
     {
@@ -153,7 +153,7 @@ trait StorableTrait
     /**
      * @return \Sayla\Objects\StorableTrait
      * @throws \Sayla\Exception\Error
-     * @throws \Sayla\Objects\Exception\TriggerError
+     * @throws \Sayla\Objects\Contract\Exception\TriggerError
      */
     public function update()
     {

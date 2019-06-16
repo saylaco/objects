@@ -3,7 +3,7 @@
 namespace Sayla\Objects\Transformers;
 
 use ErrorException;
-use Sayla\Objects\Exception\TransformationError;
+use Sayla\Objects\Contract\Exception\TransformationError;
 use Throwable;
 
 class Transformer
@@ -302,7 +302,7 @@ class Transformer
      * @param string $key
      * @param null $value
      * @return mixed|null
-     * @throws \Sayla\Objects\Exception\TransformationError
+     * @throws \Sayla\Objects\Contract\Exception\TransformationError
      */
     public function smash(string $key, $value = null)
     {
@@ -319,7 +319,7 @@ class Transformer
     /**
      * @param $attributes
      * @return mixed
-     * @throws \Sayla\Objects\Exception\TransformationError
+     * @throws \Sayla\Objects\Contract\Exception\TransformationError
      */
     public function smashAll($attributes)
     {
@@ -338,7 +338,7 @@ class Transformer
     /**
      * @param array $attributes
      * @return array
-     * @throws \Sayla\Objects\Exception\TransformationError
+     * @throws \Sayla\Objects\Contract\Exception\TransformationError
      */
     public function smashOnly(array $attributes): array
     {

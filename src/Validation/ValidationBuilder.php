@@ -5,7 +5,7 @@ namespace Sayla\Objects\Validation;
 use Illuminate\Contracts\Validation\Factory;
 use Illuminate\Contracts\Validation\Validator;
 use Sayla\Data\ArrayObject;
-use Sayla\Objects\Exception\EntityValidationException;
+use Sayla\Objects\Contract\Exception\EntityValidationException;
 
 class ValidationBuilder
 {
@@ -236,7 +236,7 @@ class ValidationBuilder
      * @param array|null $messages
      * @param array|null $customAttributes
      * @return \Illuminate\Contracts\Validation\Validator
-     * @throws \Sayla\Objects\Exception\EntityValidationException
+     * @throws \Sayla\Objects\Contract\Exception\EntityValidationException
      */
     public function validate(array $data,
                              array $rules = null,

@@ -3,7 +3,7 @@
 namespace Sayla\Objects\Attribute\PropertyType;
 
 use Sayla\Objects\Contract\Attributes\AttributeResolver;
-use Sayla\Objects\Exception\AttributeResolverNotFound;
+use Sayla\Objects\Contract\Exception\AttributeResolverNotFound;
 use Sayla\Objects\ObjectCollection;
 use Sayla\Util\Mixin\Mixin;
 
@@ -28,7 +28,7 @@ class ResolverDescriptorMixin implements Mixin
     /**
      * @param string $attributeName
      * @return \Sayla\Objects\Contract\Attributes\AttributeResolver
-     * @throws \Sayla\Objects\Exception\AttributeResolverNotFound
+     * @throws \Sayla\Objects\Contract\Exception\AttributeResolverNotFound
      */
     public function getResolver(string $attributeName): AttributeResolver
     {
@@ -59,7 +59,7 @@ class ResolverDescriptorMixin implements Mixin
      * @param \Sayla\Objects\ObjectCollection $collection
      * @param array $attributeNames
      * @return \Sayla\Objects\ObjectCollection
-     * @throws \Sayla\Objects\Exception\AttributeResolverNotFound
+     * @throws \Sayla\Objects\Contract\Exception\AttributeResolverNotFound
      */
     public function resolve(ObjectCollection $collection, array $attributeNames)
     {

@@ -1,6 +1,6 @@
 <?php
 
-namespace Sayla\Objects\Exception;
+namespace Sayla\Objects\Contract\Exception;
 
 class HydratorNotFound extends HydrationError
 {

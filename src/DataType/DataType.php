@@ -7,7 +7,7 @@ use Illuminate\Contracts\Support\Arrayable;
 use Sayla\Objects\Attribute\AttributeFactory;
 use Sayla\Objects\Contract\Stores\ObjectStore;
 use Sayla\Objects\DataObject;
-use Sayla\Objects\Exception\HydrationError;
+use Sayla\Objects\Contract\Exception\HydrationError;
 use Sayla\Objects\SimpleEventDispatcher;
 use Sayla\Objects\StorableTrait;
 use Throwable;
@@ -94,7 +94,7 @@ final class DataType
     /**
      * @param $object
      * @return array
-     * @throws \Sayla\Objects\Exception\TransformationError
+     * @throws \Sayla\Objects\Contract\Exception\TransformationError
      */
     public function extract($object): array
     {
@@ -181,7 +181,7 @@ final class DataType
      *
      * @param iterable $data
      * @return \Sayla\Objects\DataObject
-     * @throws \Sayla\Objects\Exception\HydrationError
+     * @throws \Sayla\Objects\Contract\Exception\HydrationError
      */
     public function hydrate($data)
     {
@@ -204,7 +204,7 @@ final class DataType
      * @param string $class
      * @param iterable $results
      * @return \Sayla\Objects\ObjectCollection|static[]
-     * @throws \Sayla\Objects\Exception\HydrationError
+     * @throws \Sayla\Objects\Contract\Exception\HydrationError
      */
     public function hydrateMany(iterable $results)
     {
@@ -220,7 +220,7 @@ final class DataType
      *
      * @param iterable $data
      * @return \Sayla\Objects\DataObject
-     * @throws \Sayla\Objects\Exception\HydrationError
+     * @throws \Sayla\Objects\Contract\Exception\HydrationError
      */
     public function hydrateObject(DataObject $object, $data)
     {
