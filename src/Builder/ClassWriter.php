@@ -10,12 +10,12 @@ use Sayla\Exception\Error;
 use Sayla\Objects\Attribute\PropertyType\TransformationDescriptorMixin;
 use Sayla\Objects\Contract\Attributes\AssociationResolver;
 use Sayla\Objects\Contract\DataObject\StorableObject;
+use Sayla\Objects\Contract\DataObject\StorableObjectTrait;
 use Sayla\Objects\Contract\IDataObject;
 use Sayla\Objects\Contract\Stores\ModifiesObjectBehavior;
 use Sayla\Objects\DataType\DataType;
 use Sayla\Objects\DataType\DataTypeDescriptor;
 use Sayla\Objects\DataType\DataTypeManager;
-use Sayla\Objects\StorableTrait;
 use Sayla\Objects\Stores\StoreManager;
 use Sayla\Objects\Transformers\AttributeValueTransformer;
 use Throwable;
@@ -233,7 +233,7 @@ class ClassWriter
         $interfaces = $dataType->getInterfaces();
 
         if ($dataType->hasStore()) {
-            $traits[] = StorableTrait::class;
+            $traits[] = StorableObjectTrait::class;
         }
 
 

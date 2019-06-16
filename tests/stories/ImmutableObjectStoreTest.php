@@ -3,16 +3,16 @@
 namespace Sayla\Objects\Tests\Cases;
 
 use Sayla\Objects\Contract\DataObject\ImmutableStorableObjectTrait;
+use Sayla\Objects\Contract\DataObject\StorableObjectTrait;
 use Sayla\Objects\Contract\Stores\ObjectStore;
 use Sayla\Objects\DataObject;
 use Sayla\Objects\DataType\DataTypeManager;
-use Sayla\Objects\StorableTrait;
 use Sayla\Objects\Tests\Support\BaseStory;
 
 class ImmutableBookModel extends DataObject
 {
     use ImmutableStorableObjectTrait;
-    use StorableTrait;
+    use StorableObjectTrait;
 
     public static function resolveCandyAttribute(self $book)
     {

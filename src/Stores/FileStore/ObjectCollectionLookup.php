@@ -33,7 +33,7 @@ class ObjectCollectionLookup implements Lookup
     }
 
     /**
-     * @return \Sayla\Objects\ObjectCollection|\Sayla\Objects\StorableTrait[]
+     * @return \Sayla\Objects\ObjectCollection|\Sayla\Objects\Contract\DataObject\StorableObjectTrait[]
      */
     public function all()
     {
@@ -49,7 +49,7 @@ class ObjectCollectionLookup implements Lookup
 
     /**
      * @param $key
-     * @return \Sayla\Objects\StorableTrait
+     * @return \Sayla\Objects\Contract\DataObject\StorableObjectTrait
      */
     public function find($key)
     {
@@ -62,7 +62,7 @@ class ObjectCollectionLookup implements Lookup
     /**
      * @param $attribute
      * @param $key
-     * @return \Sayla\Objects\StorableTrait
+     * @return \Sayla\Objects\Contract\DataObject\StorableObjectTrait
      */
     public function findBy($attribute, $value)
     {

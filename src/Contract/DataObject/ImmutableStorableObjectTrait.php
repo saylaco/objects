@@ -3,7 +3,7 @@
 namespace Sayla\Objects\Contract\DataObject;
 
 /**
- * @mixin \Sayla\Objects\StorableTrait
+ * @mixin \Sayla\Objects\Contract\DataObject\StorableObjectTrait
  */
 trait ImmutableStorableObjectTrait
 {

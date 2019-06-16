@@ -2,7 +2,7 @@
 
 namespace Sayla\Objects\Support\Illuminate;
 /**
- * @mixin \Sayla\Objects\StorableTrait
+ * @mixin \Sayla\Objects\Contract\DataObject\StorableObjectTrait
  * @method static EloquentStore getStore
  */
 trait EloquentObjectTrait

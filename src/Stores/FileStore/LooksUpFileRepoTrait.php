@@ -7,7 +7,7 @@ use Sayla\Objects\Stores\FileStore;
 
 /**
  * Trait LooksUpFileRepoTrait
- * @mixin \Sayla\Objects\StorableTrait
+ * @mixin \Sayla\Objects\Contract\DataObject\StorableObjectTrait
  * @method static FileStore\FileDataStore getStore()
  */
 trait LooksUpFileRepoTrait

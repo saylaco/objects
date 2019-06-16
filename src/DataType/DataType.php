@@ -5,11 +5,11 @@ namespace Sayla\Objects\DataType;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Support\Arrayable;
 use Sayla\Objects\Attribute\AttributeFactory;
+use Sayla\Objects\Contract\DataObject\StorableObjectTrait;
+use Sayla\Objects\Contract\Exception\HydrationError;
 use Sayla\Objects\Contract\Stores\ObjectStore;
 use Sayla\Objects\DataObject;
-use Sayla\Objects\Contract\Exception\HydrationError;
 use Sayla\Objects\SimpleEventDispatcher;
-use Sayla\Objects\StorableTrait;
 use Throwable;
 
 final class DataType
@@ -118,7 +118,7 @@ final class DataType
      */
     public function getBaseObjectClass(): string
     {
-        return $this->baseObjectClass ?? ($this->storeOptions ? StorableTrait::class : DataObject::class);
+        return $this->baseObjectClass ?? ($this->storeOptions ? StorableObjectTrait::class : DataObject::class);
     }
 
     /**

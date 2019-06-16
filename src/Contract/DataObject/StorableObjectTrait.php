@@ -1,6 +1,6 @@
 <?php
 
-namespace Sayla\Objects;
+namespace Sayla\Objects\Contract\DataObject;
 
 use Sayla\Objects\Contract\Storable;
 use Sayla\Objects\Contract\Stores\ObjectStore;
@@ -17,7 +17,7 @@ use Sayla\Objects\DataType\DataTypeManager;
  * @property callable|int __beforeSave
  * @mixin \Sayla\Objects\DataObject
  */
-trait StorableTrait
+trait StorableObjectTrait
 {
     private $storing = false;
 
@@ -58,7 +58,7 @@ trait StorableTrait
     }
 
     /**
-     * @return $this
+     * @return static
      * @throws \Sayla\Exception\Error
      * @throws \Sayla\Objects\Contract\Exception\TriggerError
      */
@@ -74,7 +74,7 @@ trait StorableTrait
             $instance(Storable::ON_BEFORE_CREATE);
             $newAttributes = static::getStore()->create($instance);
             if (is_iterable($newAttributes)) {
-                $instance->init($instance->dataType()->hydrateData($newAttributes));
+                $instance->init($instance::dataType()->hydrateData($newAttributes));
             }
             $instance(Storable::ON_AFTER_CREATE);
             $instance->clearModifiedAttributeFlags();
@@ -87,7 +87,7 @@ trait StorableTrait
     }
 
     /**
-     * @return \Sayla\Objects\StorableTrait
+     * @return static
      * @throws \Sayla\Exception\Error
      * @throws \Sayla\Objects\Contract\Exception\TriggerError
      */
@@ -99,7 +99,7 @@ trait StorableTrait
             $instance(Storable::ON_BEFORE_DELETE);
             $newAttributes = static::getStore()->delete($instance);
             if (is_iterable($newAttributes)) {
-                $instance->init($instance->dataType()->hydrateData($newAttributes));
+                $instance->init($instance::dataType()->hydrateData($newAttributes));
             }
             $instance(Storable::ON_AFTER_DELETE);
             $instance->clearModifiedAttributeFlags();
@@ -151,7 +151,7 @@ trait StorableTrait
     }
 
     /**
-     * @return \Sayla\Objects\StorableTrait
+     * @return static
      * @throws \Sayla\Exception\Error
      * @throws \Sayla\Objects\Contract\Exception\TriggerError
      */
@@ -164,7 +164,7 @@ trait StorableTrait
             $instance(Storable::ON_BEFORE_UPDATE);
             $newAttributes = static::getStore()->update($instance);
             if (is_iterable($newAttributes)) {
-                $instance->init($instance->dataType()->hydrateData($newAttributes));
+                $instance->init($instance::dataType()->hydrateData($newAttributes));
             }
             $instance(Storable::ON_AFTER_UPDATE);
             $instance->clearModifiedAttributeFlags();
