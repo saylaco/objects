@@ -4,7 +4,7 @@ use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Contracts\Support\Jsonable;
 use Sayla\Objects\AttributeResolverManager;
 use Sayla\Objects\Stubs\StubFactory;
-use Sayla\Objects\Transformers\ValueTransformerFactory;
+use Sayla\Objects\Transformers\TransformerFactory;
 use Sayla\Util\JsonHelper;
 
 if (!function_exists('stub')) {
@@ -17,7 +17,7 @@ if (!function_exists('stub')) {
     function stub($class, ...$arguments)
     {
         /** @var \Sayla\Objects\Stubs\StubFactory $factory */
-        $factory = StubFactory::getInstance()->make(StubFactory::class);
+        $factory = StubFactory::resolve()->make(StubFactory::class);
         if (isset($arguments[0]) && is_string($arguments[0])) {
             return $factory->of($class, $arguments[0])->times(isset($arguments[1]) ? $arguments[1] : null);
         } elseif (isset($arguments[0])) {
@@ -42,7 +42,7 @@ if (!function_exists('build_value')) {
      */
     function build_value(string $transformer, $value, $options = null)
     {
-        return ValueTransformerFactory::getInstance()
+        return TransformerFactory::resolve()
             ->getTransformer($transformer, $options)
             ->build($value);
     }
@@ -57,27 +57,8 @@ if (!function_exists('smash_value')) {
      */
     function smash_value(string $transformer, $value, $options = null)
     {
-        return ValueTransformerFactory::getInstance()
+        return TransformerFactory::resolve()
             ->getTransformer($transformer, $options)
             ->smash($value);
-    }
-}
-if (!function_exists('simple_value')) {
-    /**
-     * @param $value
-     * @return array|mixed
-     */
-    function simple_value($value)
-    {
-        if ($value instanceof JsonSerializable) {
-            return $value->jsonSerialize();
-        } elseif ($value instanceof Jsonable) {
-            return JsonHelper::decode($value->toJson(), true);
-        } elseif ($value instanceof Arrayable) {
-            return $value->toArray();
-        } elseif (!is_scalar($value)) {
-            return JsonHelper::encodeDecodeToArray($value);
-        }
-        return $value;
     }
 }
