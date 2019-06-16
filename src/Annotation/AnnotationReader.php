@@ -78,9 +78,9 @@ class AnnotationReader
         return $arg;
     }
 
-    public function addResolver(string $annotationName, string $class)
+    public function addResolver(string $annotationName, $entryClassOrClosure)
     {
-        $this->getParser()->addResolverClass($annotationName, $class);
+        $this->getParser()->addResolver($annotationName, $entryClassOrClosure);
     }
 
     /**

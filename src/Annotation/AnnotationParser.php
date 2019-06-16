@@ -6,32 +6,30 @@ use Illuminate\Support\Arr;
 
 class AnnotationParser
 {
-    const ANNOTATION_REGEX = '/@(\w+)(?:\s*(?:\(\s*)?(.*?)(?:\s*\))?)??\s*(?:\n|\*\/)/';
+    const ANNOTATION_REGEX = '/@([\w_-]+)(?:\s*(?:\(\s*)?(.*?)(?:\s*\))?)??\s*(?:\n|\*\/)/';
     const NESTED_VALUE = '/\s*(([\w\.]+)\((.*)\))/';
     const PARAMETER_REGEX = '/([\w\.]+)\s*=\s*(\[[^\]]*\]|"[^"]*"|[^,)]*)\s*(?:,|$)/';
     const PRIMARY_VALUE_REGEX = '/^(' . self::SINGLE_VALUE_PATTERN . '(?:,)).*/';
-    const SINGLE_VALUE_PATTERN = '((["\w]+)(?:\:\s*([\\\"\w]+)|\s*))';
+    const SINGLE_VALUE_PATTERN = '((["\w]+)(?:\:\s*([\|\[\]\\\"\w]+)|\s*))';
     const SINGLE_VALUE_REGEX = '/^' . self::SINGLE_VALUE_PATTERN . '$/';
     protected static $sharedResolvers = [];
     protected $resolvers = [];
 
-    public static function addSharedResolver(string $name, callable $annotationResolver)
+    /**
+     * @param string $name
+     * @param string|callable $annotationResolver
+     */
+    public static function addSharedResolver(string $name, $annotationResolver)
     {
         self::$sharedResolvers[strtolower($name)] = $annotationResolver;
     }
 
-    public static function addSharedResolverClass(string $name, string $annotationResolver)
-    {
-        self::$sharedResolvers[strtolower($name)] = $annotationResolver;
-    }
-
-    public function addResolver(string $name, callable $annotationResolver)
-    {
-        $this->resolvers[strtolower($name)] = $annotationResolver;
-        return $this;
-    }
-
-    public function addResolverClass(string $name, string $annotationResolver)
+    /**
+     * @param string $name
+     * @param string|callable $annotationResolver
+     * @return $this
+     */
+    public function addResolver(string $name, $annotationResolver)
     {
         $this->resolvers[strtolower($name)] = $annotationResolver;
         return $this;
@@ -92,7 +90,7 @@ class AnnotationParser
         $properties = [];
         $hasSingleValue = preg_match(self::SINGLE_VALUE_REGEX, $raw, $singleValue);
         $hasPrimaryValue = preg_match(self::PRIMARY_VALUE_REGEX, $raw, $primary);
-         //dump(compact('name', 'raw', 'hasPrimaryValue', 'hasSingleValue'), 'AA --- ' . __METHOD__);
+//        dump(compact('name', 'raw', 'hasPrimaryValue', 'hasSingleValue'), 'AA --- ' . __METHOD__);
         if ($hasSingleValue) {
             $value = $this->parseValue($singleValue[2]);
             $modifier = isset($singleValue[3]) ? self::parseValue($singleValue[3]) : null;
@@ -108,7 +106,7 @@ class AnnotationParser
                 $value = $raw;
             }
         }
-         //dump(compact('name', 'modifier', 'properties', 'value'), 'BB --- ' . __METHOD__);
+        //dump(compact('name', 'modifier', 'properties', 'value'), 'BB --- ' . __METHOD__);
         $resolvers = $this->getResolvers();
         if (isset($resolvers[$name])) {
             if (is_string($resolvers[$name])) {
@@ -130,12 +128,15 @@ class AnnotationParser
         $val = [];
         $hasNestedValues = preg_match_all(self::NESTED_VALUE, $raw, $nestedValues, PREG_SET_ORDER);
         $hasParams = preg_match_all(self::PARAMETER_REGEX, $raw, $params, PREG_SET_ORDER);
-        if ($hasNestedValues) {
+
+        if (!$hasParams && !$hasNestedValues) {
+            $raw = '';
+        } elseif ($hasNestedValues) {
             foreach ($nestedValues as $nestedValue) {
                 Arr::set($val, $nestedValue[2], $this->parseParams($nestedValue[3]));
                 $raw = str_replace($nestedValue[0], '', $raw);
             }
-        } else if ($hasParams) {
+        } elseif ($hasParams) {
             foreach ($params as $param) {
                 Arr::set($val, $param[1], self::parseValue($param[2]));
                 $raw = str_replace($param[0], '', $raw);
