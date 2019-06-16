@@ -5,12 +5,12 @@ namespace Sayla\Objects\Stubs;
 use ArrayAccess;
 use Faker\Generator as Faker;
 use Sayla\Objects\DataType\DataTypeManager;
+use Sayla\Support\Bindings\ResolvesSelf;
 use Symfony\Component\Finder\Finder;
 
 class StubFactory implements ArrayAccess
 {
-    /** @var self */
-    private static $instance;
+    use ResolvesSelf;
     /**
      * The model definitions in the container.
      *
@@ -42,9 +42,6 @@ class StubFactory implements ArrayAccess
     public function __construct(Faker $faker, DataTypeManager $dataTypeManager)
     {
         $this->faker = $faker;
-        if (!self::hasInstance()) {
-            self::setInstance($this);
-        }
         $this->dataTypeManager = $dataTypeManager;
     }
 
@@ -53,25 +50,14 @@ class StubFactory implements ArrayAccess
      */
     public static function getInstance(): StubFactory
     {
-        return self::$instance;
+        return self::resolve();
     }
 
-    /**
-     * @param StubFactory $instance
-     */
-    public static function setInstance(StubFactory $instance): void
+    protected static function resolutionBinding(): string
     {
-        self::$instance = $instance;
+        return self::class;
     }
-
-    /**
-     * @return bool
-     */
-    public static function hasInstance(): bool
-    {
-        return isset(self::$instance);
-    }
-
+    
     /**
      * Create an instance of the given model and persist it to the database.
      *

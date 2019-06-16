@@ -8,12 +8,22 @@ use Sayla\Objects\Transformers\TransformerFactory;
 use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
+/**
+ * @property-read array store
+ * @property-read string name
+ * @property-read string objectClass
+ * @property-read \Sayla\Objects\Transformers\TransformerFactory transformerFactory
+ * @property-read array attributes
+ * @property-read ObjectDispatcher objectDispatcher
+ * @property-read string classFile
+ */
 class Builder
 {
     private static $optionSets = [];
     /** @var callable[] */
     private $onAddDataTypeCallbacks = [];
-    private $options = [];
+    /** @var array */
+    private $options;
     /** @var callable */
     private $optionsCallback;
     /** @var callable[] */
@@ -21,30 +31,24 @@ class Builder
     /** @var callable[] */
     private $preBuildCallbacks = [];
 
+    private $resolveOptions = true;
+
     /**
      * DataTypeBuilder constructor.
      * @param string $objectClass
      */
-    public function __construct(string $objectClass, string $name = null)
+    public function __construct(string $objectClass, array $options = null)
     {
+        $this->options = $options ?? [];
         $this->options['objectClass'] = $objectClass;
-        $this->options['name'] = $name ?? $objectClass;
+        if (empty($this->options['name'])) {
+            $this->options['name'] = $objectClass;
+        }
     }
 
     public static function addOptionSet(array $matcher, array $options)
     {
         self::$optionSets[] = compact('matcher', 'options');
-    }
-
-    /**
-     * @param array $options
-     * @return \Sayla\Objects\Builder\Builder
-     */
-    public static function makeFromOptions(array $options): self
-    {
-        $builder = new self($options['objectClass'] ?? 'temp');
-        $builder->options = $options;
-        return $builder;
     }
 
     /**
@@ -58,9 +62,33 @@ class Builder
         return $this;
     }
 
+    /**
+     * @param string $key
+     * @return mixed
+     */
+    public function __get(string $key)
+    {
+        return $this->options[$key];
+    }
+
+    /**
+     * @param string $key
+     * @return bool
+     */
+    public function __isset(string $key)
+    {
+        return isset($this->options[$key]);
+    }
+
     public function afterBuild(callable $callback)
     {
         $this->postBuildCallbacks[] = $callback;
+        return $this;
+    }
+
+    public function alias(string $alias)
+    {
+        $this->options['alias'] = $alias;
         return $this;
     }
 
@@ -90,6 +118,23 @@ class Builder
         return $this;
     }
 
+    public function disableOptionsValidation()
+    {
+        $this->resolveOptions = false;
+        return $this;
+    }
+
+    public function enableOptionsValidation()
+    {
+        $this->resolveOptions = true;
+        return $this;
+    }
+
+    public function getAlias(): ?string
+    {
+        return $this->options['alias'] ?? null;
+    }
+
     public function getName(): string
     {
         return $this->options['name'];
@@ -110,16 +155,18 @@ class Builder
 
         $options = $this->options;
 
-        foreach (self::$optionSets as $optionSet) {
-            foreach ($optionSet['matcher'] as $k => $v) {
-                if (array_get($options, $k) !== $v) {
-                    continue 2;
+        if ($this->resolveOptions) {
+            foreach (self::$optionSets as $optionSet) {
+                foreach ($optionSet['matcher'] as $k => $v) {
+                    if (array_get($options, $k) !== $v) {
+                        continue 2;
+                    }
                 }
+                $options = array_merge($optionSet['options'], $options);
             }
-            $options = array_merge($optionSet['options'], $options);
-        }
 
-        $options = $this->getOptionResolver()->resolve($options);
+            $options = $this->getOptionResolver()->resolve($options);
+        }
 
         if (filled($this->postBuildCallbacks)) {
             foreach ($this->postBuildCallbacks as $buildCallback) {
@@ -195,12 +242,12 @@ class Builder
     }
 
     /**
-     * @param \Sayla\Objects\Transformers\ValueTransformerFactory $valueFactory
+     * @param \Sayla\Objects\Transformers\TransformerFactory $factory
      * @return $this
      */
-    public function valueFactory(ValueTransformerFactory $valueFactory)
+    public function transformerFactory(TransformerFactory $factory)
     {
-        $this->options[__FUNCTION__] = $valueFactory;
+        $this->options[__FUNCTION__] = $factory;
         return $this;
     }
 
@@ -229,6 +276,10 @@ class Builder
                 return $options['objectClass'];
             });
             $resolver->setAllowedTypes('name', 'string');
+            $resolver->setDefault('alias', function (Options $options) {
+                return class_basename($options['objectClass']);
+            });
+            $resolver->setAllowedTypes('alias', 'string');
             $this->optionsResolver = $resolver;
         }
         return $this->optionsResolver;

@@ -262,7 +262,7 @@ class StubBuilder
      */
     protected function store($results)
     {
-        $results->each(function (Storable  $object, $i) use ($results) {
+        $results->each(function (Storable $object, $i) use ($results) {
             if ($object->exists()) {
                 $object->update();
             } else {

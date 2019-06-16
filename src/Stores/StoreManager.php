@@ -15,7 +15,7 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class StoreManager
 {
-    private static $instance;
+    use ResolvesSelf;
     public const DEFAULT_DRIVERS = [
         'Eloquent' => EloquentStore::class,
         'File' => FileDataStore::class,
@@ -53,14 +53,10 @@ class StoreManager
         $this->container = $container;
     }
 
-    public static function getInstance(): self
-    {
-        return self::$instance;
-    }
 
-    public static function setInstance(self $instance): void
+    protected static function resolutionBinding(): string
     {
-        self::$instance = $instance;
+        return self::class;
     }
 
     public function addStore(string $name, array $options)

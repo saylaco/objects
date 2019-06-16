@@ -2,7 +2,8 @@
 
 namespace Sayla\Objects;
 
-use Sayla\Objects\Contract\ObjectStore;
+use Sayla\Objects\Contract\Storable;
+use Sayla\Objects\Contract\Stores\ObjectStore;
 use Sayla\Objects\DataType\DataTypeManager;
 
 /**
@@ -14,90 +15,53 @@ use Sayla\Objects\DataType\DataTypeManager;
  * @property callable|int __beforeUpdate
  * @property callable|int __beforeDelete
  * @property callable|int __beforeSave
- * @mixin \Sayla\Objects\Contract\Storable
  * @mixin \Sayla\Objects\DataObject
  */
 trait StorableTrait
 {
-    private $exists = false;
     private $storing = false;
 
-    /**
-     * @param static $dataModel
-     */
-    protected static function __create($dataModel)
-    {
-        $dataModel('beforeCreate');
-        $newAttributes = static::getStore()->create($dataModel);
-        if (is_iterable($newAttributes)) {
-            $dataModel->init($dataModel->dataType()->hydrateData($newAttributes));
-        }
-        $dataModel('afterCreate');
-        $dataModel->clearModifiedAttributeFlags();
-    }
-
-    /**
-     * @param static $dataModel
-     */
-    protected static function __delete($dataModel)
-    {
-        $dataModel('beforeDelete');
-        $newAttributes = static::getStore()->delete($dataModel);
-        if (is_iterable($newAttributes)) {
-            $dataModel->init($dataModel->dataType()->hydrateData($newAttributes));
-        }
-        $dataModel('afterDelete');
-        $dataModel->clearModifiedAttributeFlags();
-    }
-
-    /**
-     * @param static $dataModel
-     */
-    protected static function __save($dataModel)
-    {
-        $dataModel('beforeSave');
-        if (!$dataModel->exists) {
-            $dataModel('create');
-        } else {
-            $dataModel('update');
-        }
-        $dataModel('afterSave');
-    }
-
-    /**
-     * @param \Sayla\Objects\StorableTrait $dataModel
-     */
-    protected static function __update($dataModel)
-    {
-        $dataModel('beforeUpdate');
-        $newAttributes = static::getStore()->update($dataModel);
-        if (is_iterable($newAttributes)) {
-            $dataModel->init($dataModel->dataType()->hydrateData($newAttributes));
-        }
-        $dataModel('afterUpdate');
-        $dataModel->clearModifiedAttributeFlags();
-    }
 
     public static function getStore(): ObjectStore
     {
         return DataTypeManager::getInstance()->get(static::dataTypeName())->getStoreStrategy();
     }
 
-    public static function onCreate($listener)
+    public static function onAfterCreate($listener)
     {
-        static::descriptor()->dispatcher()->on('create', $listener);
+        static::descriptor()->dispatcher()->on(Storable::ON_AFTER_CREATE, $listener);
     }
 
-    public static function onDelete($listener)
+    public static function onAfterDelete($listener)
     {
-        static::descriptor()->dispatcher()->on('delete', $listener);
+        static::descriptor()->dispatcher()->on(Storable::ON_AFTER_DELETE, $listener);
     }
 
-    public static function onUpdate($listener)
+    public static function onAfterUpdate($listener)
     {
-        static::descriptor()->dispatcher()->on('update', $listener);
+        static::descriptor()->dispatcher()->on(Storable::ON_AFTER_UPDATE, $listener);
     }
 
+    public static function onBeforeCreate($listener)
+    {
+        static::descriptor()->dispatcher()->on(Storable::ON_BEFORE_CREATE, $listener);
+    }
+
+    public static function onBeforeDelete($listener)
+    {
+        static::descriptor()->dispatcher()->on(Storable::ON_BEFORE_DELETE, $listener);
+    }
+
+    public static function onBeforeUpdate($listener)
+    {
+        static::descriptor()->dispatcher()->on(Storable::ON_BEFORE_UPDATE, $listener);
+    }
+
+    /**
+     * @return $this
+     * @throws \Sayla\Exception\Error
+     * @throws \Sayla\Objects\Exception\TriggerError
+     */
     public function create()
     {
         if ($this->exists) {
@@ -106,28 +70,45 @@ trait StorableTrait
         $instance = $this->getStorable();
         try {
             $instance->storing = true;
-            $instance('create');
+            $instance(Storable::ON_BEFORE_SAVE);
+            $instance(Storable::ON_BEFORE_CREATE);
+            $newAttributes = static::getStore()->create($instance);
+            if (is_iterable($newAttributes)) {
+                $instance->init($instance->dataType()->hydrateData($newAttributes));
+            }
+            $instance(Storable::ON_AFTER_CREATE);
+            $instance->clearModifiedAttributeFlags();
             $instance->exists = true;
+            $instance(Storable::ON_AFTER_SAVE);
         } finally {
             $instance->storing = false;
         }
         return $instance;
     }
 
+    /**
+     * @return \Sayla\Objects\StorableTrait
+     * @throws \Sayla\Exception\Error
+     * @throws \Sayla\Objects\Exception\TriggerError
+     */
     public function delete()
     {
         $instance = $this->getStorable();
         $instance->storing = true;
         try {
-            $instance('delete');
+            $instance(Storable::ON_BEFORE_DELETE);
+            $newAttributes = static::getStore()->delete($instance);
+            if (is_iterable($newAttributes)) {
+                $instance->init($instance->dataType()->hydrateData($newAttributes));
+            }
+            $instance(Storable::ON_AFTER_DELETE);
+            $instance->clearModifiedAttributeFlags();
             $instance->exists = false;
         } finally {
             $instance->storing = false;
         }
         return $instance;
     }
-
-    abstract protected function determineExistence(): bool;
 
     public function exists()
     {
@@ -137,15 +118,6 @@ trait StorableTrait
     protected function getStorable()
     {
         return $this;
-    }
-
-    /**
-     * @param $attributes
-     */
-    protected function initialize($attributes): void
-    {
-        parent::initialize($attributes);
-        $this->exists = $this->determineExistence();
     }
 
     public function isStoring()
@@ -170,23 +142,34 @@ trait StorableTrait
 
     public function save()
     {
-        $instance = $this->getStorable();
-        try {
-            $instance->storing = true;
-            $instance('save');
-        } finally {
-            $instance->storing = false;
+        if (!$this->exists) {
+            $instance = $this->create();
+        } else {
+            $instance = $this->update();
         }
         return $instance;
     }
 
+    /**
+     * @return \Sayla\Objects\StorableTrait
+     * @throws \Sayla\Exception\Error
+     * @throws \Sayla\Objects\Exception\TriggerError
+     */
     public function update()
     {
         $instance = $this->getStorable();
         try {
             $instance->storing = true;
-            $instance('update');
+            $instance(Storable::ON_BEFORE_SAVE);
+            $instance(Storable::ON_BEFORE_UPDATE);
+            $newAttributes = static::getStore()->update($instance);
+            if (is_iterable($newAttributes)) {
+                $instance->init($instance->dataType()->hydrateData($newAttributes));
+            }
+            $instance(Storable::ON_AFTER_UPDATE);
+            $instance->clearModifiedAttributeFlags();
             $instance->exists = true;
+            $instance(Storable::ON_AFTER_SAVE);
         } finally {
             $instance->storing = false;
         }
