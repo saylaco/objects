@@ -35,6 +35,15 @@ class StorageAggregate implements ObjectStore
             $strategy->delete($object);
     }
 
+    public function exists($key)
+    {
+        foreach ($this->strategies as $strategy)
+            if ($strategy->exists($key)) {
+                return true;
+            }
+        return false;
+    }
+
     public function toStoreString($name, $arguments): string
     {
         return 'Aggregate(' . join(',', $this->strategies) . ')';
