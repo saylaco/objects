@@ -43,7 +43,7 @@ class AttributeFactory
     public function addMixins(MixinSet $mixinSet): MixinSet
     {
         collect($this->providers)
-            ->where('providerType', AttributePropertyType::PROVIDER_MIXIN)
+            ->where('providerType', AttributePropertyType::PROVIDER_DESCRIPTOR_MIXIN)
             ->map(function (array $propertyProvider) {
                 $properties = $this->getProperties($propertyProvider['property']);
                 return $propertyProvider['provider']($this->objectClass, $properties->toArray());
@@ -77,9 +77,18 @@ class AttributeFactory
         return collect($this->descriptors);
     }
 
+    public function getBeforePipeline(): Pipeline
+    {
+        $pipes = collect($this->providers)
+            ->where('providerType', AttributePropertyType::PROVIDER_EXTRACTION)
+            ->pluck('provider');
+        $pipeline = new Pipeline();
+        return $pipeline->through($pipes->all());
+    }
+
     /**
      * @param string $propertyType
-     * @return \Illuminate\Support\Collection|\Sayla\Objects\Contract\Property[]
+     * @return \Illuminate\Support\Collection|\Sayla\Objects\Contract\Attributes\Property[]
      * @throws \Sayla\Exception\Error
      */
     public function getDefinedProperties(string $propertyType)
@@ -92,36 +101,20 @@ class AttributeFactory
 
     public function getExtractionPipeline(): Pipeline
     {
-        $mapPipes = [];
-        $pipes = [];
-        collect($this->providers)
+        $pipes = collect($this->providers)
             ->where('providerType', AttributePropertyType::PROVIDER_EXTRACTION)
-            ->each(function (array $propertyProvider) use (&$mapPipes, &$pipes) {
-                if ($propertyProvider['property'] === Map::NAME) {
-                    $mapPipes[] = $propertyProvider['provider'];
-                } else {
-                    $pipes[] = $propertyProvider['provider'];
-                }
-            });
+            ->pluck('provider');
         $pipeline = new Pipeline();
-        return $pipeline->through(array_merge($mapPipes, $pipes));
+        return $pipeline->through($pipes->all());
     }
 
     public function getHydrationPipeline(): Pipeline
     {
-        $mapPipes = [];
-        $pipes = [];
-        collect($this->providers)
+        $pipes = collect($this->providers)
             ->where('providerType', AttributePropertyType::PROVIDER_HYDRATION)
-            ->each(function (array $propertyProvider) use (&$mapPipes, &$pipes) {
-                if ($propertyProvider['property'] === Map::NAME) {
-                    $mapPipes[] = $propertyProvider['provider'];
-                } else {
-                    $pipes[] = $propertyProvider['provider'];
-                }
-            });
+            ->pluck('provider');
         $pipeline = new Pipeline();
-        return $pipeline->through(array_merge($mapPipes, $pipes));
+        return $pipeline->through($pipes->all());
     }
 
     public function getMixins(): MixinSet
@@ -148,7 +141,7 @@ class AttributeFactory
 
     /**
      * @param string $propertyType
-     * @return \Illuminate\Support\Collection|\Sayla\Objects\Contract\Property[]
+     * @return \Illuminate\Support\Collection|\Sayla\Objects\Contract\Attributes\Property[]
      * @throws \Sayla\Exception\Error
      */
     public function getProperties(string $propertyType)
@@ -156,30 +149,6 @@ class AttributeFactory
         return $this->getAttributes()
             ->map->filterByProperty($propertyType)
             ->map->getFirst();
-    }
-
-    /**
-     * @param \Sayla\Objects\Contract\PropertyType $type
-     * @param $attributeName
-     * @param $attributeType
-     * @param $propertyValue
-     * @return \Sayla\Objects\Attribute\Property
-     */
-    protected function makeProperty(PropertyType $type, $attributeName, $attributeType,
-                                    $propertyValue): ?PropertyInterface
-    {
-        $value = $type->getPropertyValue($attributeName, $propertyValue, $attributeType, $this->objectClass);
-        if ($value === null) {
-            return null;
-        }
-        if (!$value instanceof PropertyInterface) {
-            if (is_array($value)) {
-                return new PropertySet($type->getName(), $value);
-            } else {
-                return new Property($type->getName(), $value);
-            }
-        }
-        return $value;
     }
 
     /**
@@ -275,5 +244,44 @@ class AttributeFactory
             }
         }
         return $normalizedDescriptors;
+    }
+
+    public function registerObjectListeners(ObjectDispatcher $dispatcher)
+    {
+        $providers = collect($this->providers)->groupBy('providerType');
+        if ($providers->has(Storable::ON_BEFORE_CREATE)) {
+            $providers[Storable::ON_BEFORE_CREATE]->each(function ($provider) use ($dispatcher) {
+                $dispatcher->on(Storable::ON_BEFORE_CREATE, $provider['provider']);
+            });
+        }
+        if ($providers->has(Storable::ON_BEFORE_DELETE)) {
+            $providers[Storable::ON_BEFORE_DELETE]->each(function ($provider) use ($dispatcher) {
+                $dispatcher->on(Storable::ON_BEFORE_DELETE, $provider['provider']);
+            });
+        }
+
+        if ($providers->has(Storable::ON_BEFORE_UPDATE)) {
+            $providers[Storable::ON_BEFORE_UPDATE]->each(function ($provider) use ($dispatcher) {
+                $dispatcher->on(Storable::ON_BEFORE_UPDATE, $provider['provider']);
+            });
+        }
+
+        if ($providers->has(Storable::ON_AFTER_CREATE)) {
+            $providers[Storable::ON_AFTER_CREATE]->each(function ($provider) use ($dispatcher) {
+                $dispatcher->on(Storable::ON_AFTER_CREATE, $provider['provider']);
+            });
+        }
+
+        if ($providers->has(Storable::ON_AFTER_DELETE)) {
+            $providers[Storable::ON_AFTER_DELETE]->each(function ($provider) use ($dispatcher) {
+                $dispatcher->on(Storable::ON_AFTER_DELETE, $provider['provider']);
+            });
+        }
+
+        if ($providers->has(Storable::ON_AFTER_UPDATE)) {
+            $providers[Storable::ON_AFTER_UPDATE]->each(function ($provider) use ($dispatcher) {
+                $dispatcher->on(Storable::ON_AFTER_UPDATE, $provider['provider']);
+            });
+        }
     }
 }

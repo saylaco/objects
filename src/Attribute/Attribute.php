@@ -15,6 +15,7 @@ class Attribute extends PropertySet
      * @param string $typeHandle
      * @param string $name
      */
+    public function __construct( string $typeHandle, string $name, array $value)
     {
         $this->typeHandle = $typeHandle;
         parent::__construct($name, $value);
@@ -55,12 +56,7 @@ class Attribute extends PropertySet
 
     public function hasProperty(string $propertyType)
     {
-        foreach ($this as $property) {
-            if ($property->getName() == $propertyType) {
-                return true;
-            }
-        }
-        return false;
+        return $this->offsetExists($propertyType);
     }
 
     /**

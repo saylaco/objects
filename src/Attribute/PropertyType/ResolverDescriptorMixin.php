@@ -27,7 +27,7 @@ class ResolverDescriptorMixin implements Mixin
 
     /**
      * @param string $attributeName
-     * @return \Sayla\Objects\Contract\AttributeResolver
+     * @return \Sayla\Objects\Contract\Attributes\AttributeResolver
      * @throws \Sayla\Objects\Exception\AttributeResolverNotFound
      */
     public function getResolver(string $attributeName): AttributeResolver
@@ -35,8 +35,8 @@ class ResolverDescriptorMixin implements Mixin
         if (!isset($this->properties[$attributeName])) {
             throw new AttributeResolverNotFound('Resolver not found for ' . $this->dataType . '.$' . $attributeName);
         }
-        /** @var \Sayla\Objects\Contract\AttributeResolver $resolver */
-        $resolver = $this->properties[$attributeName]['delegate'];
+        /** @var \Sayla\Objects\Contract\Attributes\AttributeResolver $resolver */
+        $resolver = $this->properties[$attributeName]['resolver'];
         return $resolver;
     }
 
@@ -45,15 +45,42 @@ class ResolverDescriptorMixin implements Mixin
         return isset($this->properties[$attributeName]);
     }
 
-    /**
-     * @param string $attributeName
-     * @param \Sayla\Objects\ObjectCollection|iterable $objects
-     * @return array
-     * @throws \Sayla\Objects\Exception\HydrationError
-     */
-    public function resolveValues(string $attributeName, iterable $objects)
+    public function pruneResolvable($data)
     {
-        $resolver = $this->getResolver($attributeName);
-        return $resolver->resolveMany($objects);
+        foreach (array_only($data, $this->getResolvable()) as $attributeName => $value) {
+            if ($value === null) {
+                unset($data[$attributeName]);
+            }
+        }
+        return $data;
+    }
+
+    /**
+     * @param \Sayla\Objects\ObjectCollection $collection
+     * @param array $attributeNames
+     * @return \Sayla\Objects\ObjectCollection
+     * @throws \Sayla\Objects\Exception\AttributeResolverNotFound
+     */
+    public function resolve(ObjectCollection $collection, array $attributeNames)
+    {
+        $allAttributes = [];
+        // get values with resolvers
+        $resolveViaResolvers = collect($attributeNames)->filter(function ($attributeName) {
+            return $this->hasResolver($attributeName);
+        });
+
+        foreach ($resolveViaResolvers as $attribute) {
+            $resolver = $this->getResolver($attribute);
+            $values = $resolver->resolveMany($collection);
+            foreach ($values as $i => $value) {
+                $allAttributes[$i][$attribute] = $value;
+            }
+        }
+        if (!empty($allAttributes)) {
+            foreach ($collection as $i => $object) {
+                $object->init($allAttributes[$i]);
+            }
+        }
+        return $collection;
     }
 }

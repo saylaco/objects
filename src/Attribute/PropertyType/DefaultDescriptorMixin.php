@@ -23,7 +23,7 @@ class DefaultDescriptorMixin implements Mixin
     {
         $defaultValues = [];
         foreach ($this->properties as $k => $v) {
-            $defaultValues[$k] = value($v);
+            $defaultValues[$k] = value($v->defaultValue);
         }
         return $defaultValues;
     }

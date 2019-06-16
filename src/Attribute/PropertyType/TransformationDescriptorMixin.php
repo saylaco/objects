@@ -37,17 +37,17 @@ class TransformationDescriptorMixin implements Mixin
             $transformer = new Transformer(array_except($this->transformations, $excludedAttributes));
         }
 
-        if (isset($this->valueFactory)) {
-            $transformer->setFactory($this->valueFactory);
+        if (isset($this->factory)) {
+            $transformer->setFactory($this->factory);
         }
         return $transformer;
     }
 
     /**
-     * @param \Sayla\Objects\Transformers\ValueTransformerFactory $valueFactory
+     * @param \Sayla\Objects\Transformers\TransformerFactory $valueFactory
      */
-    public function setValueFactory(ValueTransformerFactory $valueFactory): void
+    public function setValueFactory(TransformerFactory $valueFactory): void
     {
-        $this->valueFactory = $valueFactory;
+        $this->factory = $valueFactory;
     }
 }

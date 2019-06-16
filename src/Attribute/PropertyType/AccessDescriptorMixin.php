@@ -18,18 +18,38 @@ class AccessDescriptorMixin implements Mixin
         $this->access = collect($access);
     }
 
+    public function getVisible(): array
+    {
+        return $this->access->filter->visible->keys()->all();
+    }
+
+    public function getHidden(): array
+    {
+        return $this->access->filter->hidden->keys()->all();
+    }
+
     public function getWritable(): array
     {
         return $this->access->filter->writable->keys()->all();
     }
 
+    public function isHidden(string $attributeName): bool
+    {
+        return $this->access[$attributeName]['hidden'];
+    }
+
     public function isReadable(string $attributeName): bool
     {
-        return $this->access[$attributeName]['readable'] ?? false;
+        return $this->access[$attributeName]['readable'];
+    }
+
+    public function isVisible(string $attributeName)
+    {
+        return $this->access[$attributeName]['visible'];
     }
 
     public function isWritable(string $attributeName): bool
     {
-        return $this->access[$attributeName]['writable'] ?? false;
+        return $this->access[$attributeName]['writable'];
     }
 }
