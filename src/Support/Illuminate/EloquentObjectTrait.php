@@ -7,11 +7,29 @@ namespace Sayla\Objects\Support\Illuminate;
  */
 trait EloquentObjectTrait
 {
+    /**
+     * @return static[]
+     * @throws \Sayla\Objects\Exception\HydrationError
+     */
     public static function all()
     {
         return self::dataType()->hydrateMany(static::query()->toBase()->get());
     }
 
+    public static function findAll(array $filter)
+    {
+        $query = static::query();
+        $renamedData = self::dataType()->extract($filter);
+        $query->where($renamedData);
+        $results = $query->toBase()->get();
+        return self::dataType()->hydrateMany($results);
+    }
+
+    /**
+     * @param $id
+     * @return static
+     * @throws \Sayla\Objects\Exception\HydrationError
+     */
     public static function find($id)
     {
         $model = static::query()->toBase()->find($id);
@@ -20,9 +38,14 @@ trait EloquentObjectTrait
             : null;
     }
 
+    /**
+     * @param $id
+     * @return static
+     * @throws \Sayla\Objects\Exception\HydrationError
+     */
     public static function findOrFail($id)
     {
-        return self::dataType()->hydrate(static::query()->toBase()->findOrFail($id));
+        return self::dataType()->hydrate(static::query()->findOrFail($id));
     }
 
     public static function query()

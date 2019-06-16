@@ -33,6 +33,13 @@ class EloquentStore implements ObjectStore, ConfigurableStore, ModifiesObjectBeh
         });
     }
 
+    public static function getObjectBehavior(): array
+    {
+        return [
+            EloquentObjectTrait::class
+        ];
+    }
+
     public function __toString(): string
     {
         return $this->toStoreString();
@@ -142,7 +149,7 @@ class EloquentStore implements ObjectStore, ConfigurableStore, ModifiesObjectBeh
 
     /**
      * @param Model $model
-     * @param \Sayla\Objects\Contract\StorableObject $object
+     * @param \Sayla\Objects\Contract\DataObject\StorableObject $object
      * @return Model
      */
     protected function updateModel($model, $object)

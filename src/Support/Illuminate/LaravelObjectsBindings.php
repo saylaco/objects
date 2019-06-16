@@ -16,15 +16,34 @@ use Sayla\Objects\Validation\ValidationBuilder;
 
 class LaravelObjectsBindings extends ObjectsBindings
 {
-    public function booting()
+    public function booting(Application $container, $aliases)
     {
+        $container->extend(DataTypeManager::class, function (DataTypeManager $manager, $app) {
+            $manager->setDispatcher($app['events']);
+            return $manager;
+        });
         if ($bootValidationFactory = $this->option('bootValidationFactory')) {
-            $bootValidationFactory = is_bool($bootValidationFactory)
-                ? Factory::class
-                : $bootValidationFactory;
-            ValidationBuilder::setSharedValidationFactory(
-                \Illuminate\Container\Container::getInstance()->make($bootValidationFactory)
-            );
+            $bootValidationFactory = is_bool($bootValidationFactory) ? 'validator' : $bootValidationFactory;
+            /** @var Factory $validator */
+            $validator = $container->make($bootValidationFactory);
+            $validator->extend('objExists', function ($attribute, $value, $args) use ($container, $aliases) {
+                /** @var DataTypeManager $dataTypeManager */
+                $dataTypeManager = $container->get($aliases['dataTypeManager']);
+                /** @var \Sayla\Objects\Stores\StoreManager $store */
+                return filled($value) ? $dataTypeManager
+                    ->get($args[0])->getStoreStrategy()
+                    ->exists($value) : false;
+            }, 'Object not found.');
+            ValidationBuilder::setSharedValidationFactory($validator);
+        }
+        if ($bootOwnerCallback = $this->option('bootOwnerCallback')) {
+            OwnedDescriptorMixin::setDefaultUserAttributeCallback(function (string $attributeName) {
+                /** @var \Illuminate\Auth\AuthManager $auth */
+                $auth = app('auth');
+                $guard = $auth->guard();
+                $authenticatable = $guard->user();
+                return $authenticatable->{$attributeName};
+            });
         }
 
         Builder::addOptionSet(
@@ -35,12 +54,25 @@ class LaravelObjectsBindings extends ObjectsBindings
                 ]
             ]
         );
+//        Builder::addOptionSet(
+//            ['store.driver' => 'file'],
+//            [
+//                'traits' => [
+//                    LooksUpFileRepoTrait::class
+//                ],
+//            ]
+//        );
     }
 
     protected function configureOptions($optionsResolver): void
     {
-        $optionsResolver->setDefaults(['bootValidationFactory' => true, 'stubsPath' => null]);
+        $optionsResolver->setDefaults([
+            'bootOwnerCallback' => true,
+            'bootValidationFactory' => true,
+            'stubsPath' => null
+        ]);
         $optionsResolver->setAllowedTypes('bootValidationFactory', ['boolean', 'string']);
+        $optionsResolver->setAllowedTypes('bootOwnerCallback', 'boolean');
         $optionsResolver->setAllowedTypes('stubsPath', 'string');
     }
 
