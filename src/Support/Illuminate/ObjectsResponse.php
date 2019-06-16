@@ -63,7 +63,7 @@ class ObjectsResponse extends JsonResponse
             $obj->resolve(...$resolvableAttributes);
         }
         $visibleObject = $obj->toVisibleObject();
-        $visibleObject->fill($obj->resolveGetters(...$resolvableAttributes));
+        $visibleObject->fill($obj->runGetters(...$resolvableAttributes));
         return $visibleObject;
     }
 
@@ -81,7 +81,7 @@ class ObjectsResponse extends JsonResponse
         /** @var \Illuminate\Support\Collection $visibleObjects */
         return $collection->map(function (DataObject $obj) use ($resolvableAttributes) {
             $visibleObject = $obj->toVisibleObject();
-            $visibleObject->fill($obj->resolveGetters(...$resolvableAttributes));
+            $visibleObject->fill($obj->runGetters(...$resolvableAttributes));
             return $visibleObject;
         });
     }
