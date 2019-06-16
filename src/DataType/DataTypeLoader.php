@@ -2,7 +2,7 @@
 
 namespace Sayla\Objects\DataType;
 
-use Sayla\Objects\Builder\Builder;
+use Sayla\Objects\Builder\DataTypeConfig;
 use Symfony\Component\Yaml\Yaml;
 
 class DataTypeLoader
@@ -44,7 +44,7 @@ class DataTypeLoader
 
     /**
      * @param \Sayla\Objects\DataType\DataTypeManager $manager
-     * @return Builder[]
+     * @return DataTypeConfig[]
      */
     public function build(DataTypeManager $manager)
     {
@@ -130,7 +130,7 @@ class DataTypeLoader
     }
 
 
-    protected function makeBuilder(DataTypeManager $manager, array $object): Builder
+    protected function makeBuilder(DataTypeManager $manager, array $object): DataTypeConfig
     {
         $configType = $object['configType'];
         $object = $this->runCallbacks($configType, $object);

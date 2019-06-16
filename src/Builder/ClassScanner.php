@@ -26,7 +26,7 @@ class ClassScanner
         $this->annotationCacheDir = $annotationCacheDir;
     }
 
-    public function __invoke(Builder $builder)
+    public function __invoke(DataTypeConfig $builder)
     {
         $reflectionClass = new ReflectionClass($builder->getObjectClass());
         $attributes = array_merge(
@@ -65,7 +65,7 @@ class ClassScanner
     }
 
     /**
-     * @param \Sayla\Objects\Builder\Builder $builder
+     * @param \Sayla\Objects\Builder\DataTypeConfig $builder
      * @param \ReflectionClass $reflectionClass
      * @return array
      * @throws \zpt\anno\ReflectorNotCommentedException

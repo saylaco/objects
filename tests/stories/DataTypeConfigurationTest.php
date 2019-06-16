@@ -21,14 +21,14 @@ class DataTypeConfigurationTest extends BaseStory
 
     public static function setUpBeforeClass()
     {
-        $builder = DataTypeManager::resolve()->makeBuilder(Book::class);
-        $builder->attributes([
+        $config = DataTypeManager::resolve()->makeTypeConfig(Book::class);
+        $config->attributes([
             'title:string',
             'author:string',
             'publishDate:datetime' => ['transform.format' => 'Y-m-d', 'map' => 'publish_date'],
             'candy:string' => ['map' => false]
         ]);
-        $builder->build();
+        $config->build();
     }
 
     protected function setUp()

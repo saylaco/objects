@@ -17,7 +17,7 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
  * @property-read ObjectDispatcher objectDispatcher
  * @property-read string classFile
  */
-class Builder
+class DataTypeConfig
 {
     private static $optionSets = [];
     /** @var callable[] */

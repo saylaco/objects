@@ -10,8 +10,8 @@ use Illuminate\Contracts\Support\Arrayable;
 use IteratorAggregate;
 use ReflectionClass;
 use Sayla\Exception\Error;
-use Sayla\Objects\Builder\Builder;
 use Sayla\Objects\Builder\ClassScanner;
+use Sayla\Objects\Builder\DataTypeConfig;
 use Sayla\Objects\Contract\DataObject\SupportsDataTypeManager;
 use Sayla\Objects\Contract\RegistrarRepository;
 use Sayla\Objects\Contract\Stores\Lookup;
@@ -29,9 +29,9 @@ class DataTypeManager implements IteratorAggregate, Arrayable
     /** @var bool */
     protected $alwaysScanClasses = false;
     /** @var callable */
-    protected $builderResolver;
-    /** @var Builder[] */
-    protected $builders = [];
+    protected $configBuilder;
+    /** @var DataTypeConfig[] */
+    protected $configs = [];
     /** @var \Illuminate\Contracts\Events\Dispatcher */
     protected $dispatcher;
     /** @var bool */
@@ -39,10 +39,10 @@ class DataTypeManager implements IteratorAggregate, Arrayable
     /** @var \Sayla\Objects\Stores\StoreManager */
     protected $storeManager;
     private $aliases = [];
-    /** @var RegistrarRepository[] */
-    private $builderRepos = [];
     /** @var \Sayla\Objects\Builder\ClassScanner */
     private $classScanner;
+    /** @var RegistrarRepository[] */
+    private $configRepos = [];
     /** @var DataType[] */
     private $dataTypes = [];
     /** @var callable[] */
@@ -76,30 +76,30 @@ class DataTypeManager implements IteratorAggregate, Arrayable
         return $this;
     }
 
-    protected function addBuilder(Builder $builder)
-    {
-        if (!empty($builder->getAlias()) && !isset($this->aliases[$builder->getAlias()])) {
-            $this->aliases[$builder->getAlias()] = $builder->getName();
-        }
-
-        if (!isset($this->aliases[$builder->getObjectClass()])) {
-            $this->aliases[$builder->getObjectClass()] = $builder->getName();
-        }
-        return $this->builders[] = $builder;
-    }
-
     public function addBuilderRepo(RegistrarRepository $cache)
     {
-        $this->builderRepos[] = $cache;
+        $this->configRepos[] = $cache;
     }
 
     public function addClass(string $class, string $classFile = null)
     {
-        $builder = $this->makeBuilder($class, compact('classFile'));
+        $config = $this->makeTypeConfig($class, compact('classFile'));
         if (!$this->alwaysScanClasses) {
-            $builder->beforeBuild($this->classScanner);
+            $config->beforeBuild($this->classScanner);
         }
-        return $this->addBuilder($builder);
+        return $this->addConfig($config);
+    }
+
+    protected function addConfig(DataTypeConfig $config)
+    {
+        if (!empty($config->getAlias()) && !isset($this->aliases[$config->getAlias()])) {
+            $this->aliases[$config->getAlias()] = $config->getName();
+        }
+
+        if (!isset($this->aliases[$config->getObjectClass()])) {
+            $this->aliases[$config->getObjectClass()] = $config->getName();
+        }
+        return $this->configs[] = $config;
     }
 
     public function addConfigured(array $options)
@@ -109,17 +109,17 @@ class DataTypeManager implements IteratorAggregate, Arrayable
                 ? self::classFilePath($options['objectClass'])
                 : null;
         }
-        $builder = $this->makeBuilder($options['objectClass'], $options);
-        return $this->addBuilder($builder->disableOptionsValidation());
+        $config = $this->makeTypeConfig($options['objectClass'], $options);
+        return $this->addConfig($config->disableOptionsValidation());
     }
 
     /**
-     * @param \Sayla\Objects\Builder\Builder $builder
+     * @param \Sayla\Objects\Builder\DataTypeConfig $config
      * @return DataType
      */
-    protected function addDataType(Builder $builder): DataType
+    protected function addDataType(DataTypeConfig $config): DataType
     {
-        $options = $builder->getOptions();
+        $options = $config->getOptions();
         $dataType = new DataType($options);
         $this->dataTypes[$dataType->getName()] = $dataType;
         if ($dataType->hasStore()) {
@@ -135,7 +135,7 @@ class DataTypeManager implements IteratorAggregate, Arrayable
         if (is_subclass_of($objectClass, SupportsDataTypeManager::class)) {
             $objectClass::setDataTypeManager($this);
         }
-        $builder->runAddDataType($dataType);
+        $config->runAddDataType($dataType);
         return $dataType;
     }
 
@@ -221,22 +221,22 @@ class DataTypeManager implements IteratorAggregate, Arrayable
         }
 
         if ($this->registersProviders) {
-            foreach ($this->builderRepos as $provider)
-                foreach ($provider->getBuilders() as $builderArray) {
-                    $this->addConfigured($builderArray);
+            foreach ($this->configRepos as $provider)
+                foreach ($provider->getAllOptions() as $options) {
+                    $this->addConfigured($options);
                 }
         }
 
-        foreach ($this->builders as $builder) {
-            $objectClass = $builder->getObjectClass();
+        foreach ($this->configs as $config) {
+            $objectClass = $config->getObjectClass();
 
-            if (TransformerFactory::isSharedType($builder->getName())) {
+            if (TransformerFactory::isSharedType($config->getName())) {
                 continue;
             }
-            $this->addAttributeType($builder->getName(), $objectClass);
+            $this->addAttributeType($config->getName(), $objectClass);
         }
-        foreach ($this->builders as $builder) {
-            $this->addDataType($builder);
+        foreach ($this->configs as $config) {
+            $this->addDataType($config);
         }
         if ($this->dispatcher) {
             $this->dispatcher->dispatch(self::ON_INIT);
@@ -244,27 +244,27 @@ class DataTypeManager implements IteratorAggregate, Arrayable
         return $this;
     }
 
-    public function makeBuilder(string $objectClass, array $options = null): Builder
+    public function makeTypeConfig(string $objectClass, array $options = null): DataTypeConfig
     {
-        $builder = new Builder($objectClass, $options);
+        $config = new DataTypeConfig($objectClass, $options);
 
         if (!isset($options['classFile']) && class_exists($objectClass, false)) {
-            $builder->classFile(self::classFilePath($objectClass));
+            $config->classFile(self::classFilePath($objectClass));
         }
 
-        if ($this->builderResolver) {
-            $builder->runCallback($this->builderResolver);
+        if ($this->configBuilder) {
+            $config->runCallback($this->configBuilder);
         }
 
-        if ($this->alwaysScanClasses && isset($builder->classFile)) {
-            $builder->beforeBuild($this->classScanner);
+        if ($this->alwaysScanClasses && isset($config->classFile)) {
+            $config->beforeBuild($this->classScanner);
         }
 
-        if (!isset($this->aliases[$builder->getName()])) {
-            $this->aliases[$builder->getName()] = $objectClass;
+        if (!isset($this->aliases[$config->getName()])) {
+            $this->aliases[$config->getName()] = $objectClass;
         }
 
-        return $builder;
+        return $config;
     }
 
     public function onAddDataType(callable $callback)
@@ -283,9 +283,9 @@ class DataTypeManager implements IteratorAggregate, Arrayable
      * @param callable $callback
      * @return $this
      */
-    public function setBuilderResolver(callable $callback)
+    public function setConfigBuilder(callable $callback)
     {
-        $this->builderResolver = $callback;
+        $this->configBuilder = $callback;
         return $this;
     }
 

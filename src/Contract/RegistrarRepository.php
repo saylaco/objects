@@ -2,11 +2,11 @@
 
 namespace Sayla\Objects\Contract;
 
-use Sayla\Objects\Builder\Builder;
+use Sayla\Objects\Builder\DataTypeConfig;
 
 interface RegistrarRepository
 {
-    public function addBuilder(Builder $builder);
+    public function addBuilder(DataTypeConfig $builder);
 
     public function flush();
 
@@ -15,6 +15,6 @@ interface RegistrarRepository
      *
      * @return array[]
      */
-    public function getBuilders(): iterable;
+    public function getAllOptions(): iterable;
 
 }

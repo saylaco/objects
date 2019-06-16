@@ -200,7 +200,7 @@ class MutableObjectStoreTest extends BaseStory
     private function getDataType(): DataType
     {
         $dataTypeManager = new DataTypeManager();
-        $builder = $dataTypeManager->makeBuilder(MutableBookModel::class)->storeStrategy('default');
+        $builder = $dataTypeManager->makeTypeConfig(MutableBookModel::class)->storeStrategy('default');
         $builder->attributes([
             'id:pk' => ['mapTo' => '_id'],
             'title:string',
