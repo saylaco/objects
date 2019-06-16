@@ -11,7 +11,7 @@ trait SupportsDataTypeManagerTrait
 
     public static function getDataTypeManager(): DataTypeManager
     {
-        return self::$dataTypeManager ?? DataTypeManager::getInstance();
+        return self::$dataTypeManager ?? DataTypeManager::resolve();
     }
 
     public static function setDataTypeManager(DataTypeManager $dataTypeManager)

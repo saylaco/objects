@@ -54,7 +54,7 @@ class ObjectCollectionLookup implements Lookup
     public function find($key)
     {
         if (isset($this->records[$key])) {
-            return DataTypeManager::getInstance()->get($this->dataType)->hydrate($this->records[$key]);
+            return DataTypeManager::resolve()->get($this->dataType)->hydrate($this->records[$key]);
         }
         return $this->all()->firstWhere($this->keyAttribute, '=', $key);
     }

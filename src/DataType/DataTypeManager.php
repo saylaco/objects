@@ -63,11 +63,6 @@ class DataTypeManager implements IteratorAggregate, Arrayable
         return $reflector->getFileName();
     }
 
-    public static function getInstance(): self
-    {
-        return self::resolve();
-    }
-
     protected static function resolutionBinding(): string
     {
         return self::class;

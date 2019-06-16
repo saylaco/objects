@@ -24,7 +24,7 @@ trait StorableObjectTrait
 
     public static function getStore(): ObjectStore
     {
-        return DataTypeManager::getInstance()->get(static::dataTypeName())->getStoreStrategy();
+        return DataTypeManager::resolve()->get(static::dataTypeName())->getStoreStrategy();
     }
 
     public static function onAfterCreate($listener)

@@ -81,7 +81,7 @@ class ObjectCollection extends Collection implements Responsable, Collectionable
      */
     public function getItemDescriptor(): DataTypeDescriptor
     {
-        return DataTypeManager::getInstance()->getDescriptor($this->dataTypeName);
+        return DataTypeManager::resolve()->getDescriptor($this->dataTypeName);
     }
 
     public function groupBy($groupBy, $preserveKeys = false)
@@ -125,7 +125,7 @@ class ObjectCollection extends Collection implements Responsable, Collectionable
      */
     protected function makeObject($item)
     {
-        return DataTypeManager::getInstance()->get($this->dataTypeName)->hydrate($item);
+        return DataTypeManager::resolve()->get($this->dataTypeName)->hydrate($item);
     }
 
     /**

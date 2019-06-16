@@ -57,7 +57,7 @@ class Transform implements AttributePropertyType
             $possibleDataObjectName = $isArray ? str_before($attributeType, '[]') : $attributeType;
             if (
                 is_subclass_of($possibleDataObjectName, IDataObject::class, true)
-                || DataTypeManager::getInstance()->has($possibleDataObjectName)
+                || DataTypeManager::resolve()->has($possibleDataObjectName)
             ) {
                 $value['type'] = $isArray ? 'objectCollection' : 'object';
                 $value['dataType'] = $possibleDataObjectName;

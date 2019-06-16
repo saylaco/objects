@@ -71,7 +71,7 @@ class MutableObjectStoreTest extends BaseStory
 
     public function testDelete()
     {
-        DataTypeManager::getInstance()->getStoreManager()->extend('default', ObjectStore::class, function () {
+        DataTypeManager::resolve()->getStoreManager()->extend('default', ObjectStore::class, function () {
 
             $storeStrategy = $this->getMockBuilder(ObjectStore::class)
                 ->setMethods(['create', 'delete'])
@@ -111,7 +111,7 @@ class MutableObjectStoreTest extends BaseStory
 
     public function testSave()
     {
-        DataTypeManager::getInstance()->getStoreManager()->extend('default', ObjectStore::class, function () {
+        DataTypeManager::resolve()->getStoreManager()->extend('default', ObjectStore::class, function () {
             $storeStrategy = $this->getMockBuilder(ObjectStore::class)
                 ->setMethods(['create', 'update'])
                 ->getMock();

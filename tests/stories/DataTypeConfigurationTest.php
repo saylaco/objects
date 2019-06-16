@@ -21,7 +21,7 @@ class DataTypeConfigurationTest extends BaseStory
 
     public static function setUpBeforeClass()
     {
-        $builder = DataTypeManager::getInstance()->makeBuilder(Book::class);
+        $builder = DataTypeManager::resolve()->makeBuilder(Book::class);
         $builder->attributes([
             'title:string',
             'author:string',
@@ -38,7 +38,7 @@ class DataTypeConfigurationTest extends BaseStory
 
     public function testExtraction(): void
     {
-        $dataType = DataTypeManager::getInstance()->get(Book::class);
+        $dataType = DataTypeManager::resolve()->get(Book::class);
 
         $data = $this->getRawBookData();
         /** @var Book $book */
@@ -53,7 +53,7 @@ class DataTypeConfigurationTest extends BaseStory
 
     public function testHydration(): void
     {
-        $dataType = DataTypeManager::getInstance()->get(Book::class);
+        $dataType = DataTypeManager::resolve()->get(Book::class);
 
         $data = $this->getRawBookData();
         /** @var Book $book */
@@ -79,7 +79,7 @@ class DataTypeConfigurationTest extends BaseStory
 
     public function testMappableProperties(): void
     {
-        $dataType = DataTypeManager::getInstance()->get(Book::class);
+        $dataType = DataTypeManager::resolve()->get(Book::class);
         $mappable = $dataType->getDescriptor()->getMappable();
         sort($mappable);
         $this->assertEquals(['author', 'publishDate', 'title'], $mappable);
