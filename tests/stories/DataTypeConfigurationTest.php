@@ -2,10 +2,9 @@
 
 namespace Sayla\Objects\Tests\Cases;
 
-use Sayla\Objects\Attribute\Property\MapPropertyType;
 use Sayla\Objects\DataObject;
+use Sayla\Objects\DataType\DataType;
 use Sayla\Objects\DataType\DataTypeManager;
-use Sayla\Objects\DataType\StandardDataType;
 use Sayla\Objects\Tests\Support\BaseStory;
 
 class Book extends DataObject
@@ -20,22 +19,21 @@ class Book extends DataObject
 class DataTypeConfigurationTest extends BaseStory
 {
 
-    protected function setUp()
-    {
-        DataObject::clearTriggerCallCount(Book::class);
-    }
-
     public static function setUpBeforeClass()
     {
-        $builder = DataTypeManager::getInstance()->getBuilder(Book::class);
-        $builder->attributeDefinitions([
+        $builder = DataTypeManager::getInstance()->makeBuilder(Book::class);
+        $builder->attributes([
             'title:string',
             'author:string',
             'publishDate:datetime' => ['transform.format' => 'Y-m-d', 'map' => 'publish_date'],
             'candy:string' => ['map' => false]
         ]);
-        $builder->addPropertyType((new MapPropertyType())->enableAutoMapping());
         $builder->build();
+    }
+
+    protected function setUp()
+    {
+        DataObject::clearTriggerCallCount(Book::class);
     }
 
     public function testExtraction(): void
@@ -53,14 +51,6 @@ class DataTypeConfigurationTest extends BaseStory
         $this->assertEquals($data['publish_date'], $bookData['publish_date']);
     }
 
-    /**
-     * @return array
-     */
-    private function getRawBookData(): array
-    {
-        return ['title' => 'Better than butter', 'author' => 'Mike Sah', 'publish_date' => '2014-03-01'];
-    }
-
     public function testHydration(): void
     {
         $dataType = DataTypeManager::getInstance()->get(Book::class);
@@ -71,7 +61,7 @@ class DataTypeConfigurationTest extends BaseStory
 
         /** @var SimpleDataType $dataType */
         $dataType = unserialize(serialize($dataType));
-        $this->assertInstanceOf(StandardDataType::class, $dataType);
+        $this->assertInstanceOf(DataType::class, $dataType);
 
         $this->assertEquals($data['title'], $book->title);
         $this->assertEquals($data['author'], $book->author);
@@ -93,5 +83,13 @@ class DataTypeConfigurationTest extends BaseStory
         $mappable = $dataType->getDescriptor()->getMappable();
         sort($mappable);
         $this->assertEquals(['author', 'publishDate', 'title'], $mappable);
+    }
+
+    /**
+     * @return array
+     */
+    private function getRawBookData(): array
+    {
+        return ['title' => 'Better than butter', 'author' => 'Mike Sah', 'publish_date' => '2014-03-01'];
     }
 }

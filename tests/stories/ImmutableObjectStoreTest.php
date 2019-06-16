@@ -2,17 +2,17 @@
 
 namespace Sayla\Objects\Tests\Cases;
 
-use Sayla\Objects\Attribute\Property\MapPropertyType;
-use Sayla\Objects\Contract\ImmutableDataModelTrait;
-use Sayla\Objects\Contract\ObjectStore;
-use Sayla\Objects\DataModel;
+use Sayla\Objects\Contract\DataObject\ImmutableStorableObjectTrait;
+use Sayla\Objects\Contract\Stores\ObjectStore;
 use Sayla\Objects\DataObject;
 use Sayla\Objects\DataType\DataTypeManager;
+use Sayla\Objects\StorableTrait;
 use Sayla\Objects\Tests\Support\BaseStory;
 
-class ImmutableBookModel extends DataModel
+class ImmutableBookModel extends DataObject
 {
-    use ImmutableDataModelTrait;
+    use ImmutableStorableObjectTrait;
+    use StorableTrait;
 
     public static function resolveCandyAttribute(self $book)
     {
@@ -71,21 +71,20 @@ class ImmutableObjectStoreTest extends BaseStory
 
     /**
      * @param $storeStrategy
-     * @return \Sayla\Objects\DataType\StoringDataType
+     * @return \Sayla\Objects\DataType\DataType
      */
-    private function getDataType($storeStrategy): \Sayla\Objects\DataType\StoringDataType
+    private function getDataType(): \Sayla\Objects\DataType\DataType
     {
         $dataTypeManager = new DataTypeManager();
-        $builder = $dataTypeManager->getBuilder(ImmutableBookModel::class)->storeStrategy($storeStrategy);
+        $builder = $dataTypeManager->makeBuilder(ImmutableBookModel::class)->store('default');
         return $builder
-            ->attributeDefinitions([
+            ->attributes([
                 'id:pk' => ['mapTo' => '_id'],
                 'title:string',
                 'author:string',
                 'publishDate:datetime' => ['transform.format' => 'Y-m-d', 'mapTo' => 'publish_date'],
                 'candy:string' => ['map' => false]
             ])
-            ->addPropertyType((new MapPropertyType())->enableAutoMapping())
             ->build();
     }
 
@@ -114,7 +113,7 @@ class ImmutableObjectStoreTest extends BaseStory
                 $this->assertTrue($bookModel->isStoring());
             });
 
-        $dataType = $this->getDataType($storeStrategy);
+        $dataType = $this->getDataType();
 
         $data = $this->getRawBookData();
         /** @var ImmutableBookModel $book */
