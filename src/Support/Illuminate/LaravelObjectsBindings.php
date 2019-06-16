@@ -4,19 +4,23 @@ namespace Sayla\Objects\Support\Illuminate;
 
 use Faker\Generator as FakerGenerator;
 use Illuminate\Contracts\Container\Container;
-use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Validation\Factory;
 use Sayla\Objects\Attribute\PropertyType\OwnedDescriptorMixin;
-use Sayla\Objects\Builder\Builder;
 use Sayla\Objects\DataType\DataTypeManager;
 use Sayla\Objects\ObjectsBindings;
 use Sayla\Objects\Stubs\StubFactory;
 use Sayla\Objects\Validation\ValidationBuilder;
+use Sayla\Support\Bindings\BindingSetBuilder;
+use Sayla\Support\Bindings\Contract\RunsOnBoot;
 
 
-class LaravelObjectsBindings extends ObjectsBindings
+class LaravelObjectsBindings extends ObjectsBindings implements RunsOnBoot
 {
-    public function booting(Application $container, $aliases)
+    /**
+     * @param \Illuminate\Contracts\Foundation\Application $container
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function booting($container, $qualifiedAliases): void
     {
         $container->extend(DataTypeManager::class, function (DataTypeManager $manager, $app) {
             $manager->setDispatcher($app['events']);
@@ -26,9 +30,9 @@ class LaravelObjectsBindings extends ObjectsBindings
             $bootValidationFactory = is_bool($bootValidationFactory) ? 'validator' : $bootValidationFactory;
             /** @var Factory $validator */
             $validator = $container->make($bootValidationFactory);
-            $validator->extend('objExists', function ($attribute, $value, $args) use ($container, $aliases) {
+            $validator->extend('objExists', function ($attribute, $value, $args) use ($container, $qualifiedAliases) {
                 /** @var DataTypeManager $dataTypeManager */
-                $dataTypeManager = $container->get($aliases['dataTypeManager']);
+                $dataTypeManager = $container->get($qualifiedAliases['dataTypeManager']);
                 /** @var \Sayla\Objects\Stores\StoreManager $store */
                 return filled($value) ? $dataTypeManager
                     ->get($args[0])->getStoreStrategy()
@@ -45,23 +49,6 @@ class LaravelObjectsBindings extends ObjectsBindings
                 return $authenticatable->{$attributeName};
             });
         }
-
-        Builder::addOptionSet(
-            ['store.driver' => 'eloquent'],
-            [
-                'traits' => [
-                    EloquentObjectTrait::class
-                ]
-            ]
-        );
-//        Builder::addOptionSet(
-//            ['store.driver' => 'file'],
-//            [
-//                'traits' => [
-//                    LooksUpFileRepoTrait::class
-//                ],
-//            ]
-//        );
     }
 
     protected function configureOptions($optionsResolver): void
@@ -79,18 +66,16 @@ class LaravelObjectsBindings extends ObjectsBindings
     /**
      * @return array
      */
-    protected function getBindingSet(): array
+    protected function getBindingSet($setBuilder): array
     {
-        return $this->prepareLaravelBindings(parent::getBindingSet());
+        parent::getBindingSet($setBuilder);
+        $this->prepareLaravelBindings($setBuilder);
+        return $setBuilder->getBindings();
     }
 
-    /**
-     * @return array
-     */
-    protected function prepareLaravelBindings(array $bindings)
+    protected function prepareLaravelBindings(BindingSetBuilder $setBuilder)
     {
-        $bindings['objectStubs'] = [
-            StubFactory::class,
+        $setBuilder->add('objectStubs', StubFactory::class,
             function (Container $app) {
                 $stubFactory = new StubFactory(
                     $app->make(FakerGenerator::class),
@@ -101,9 +86,7 @@ class LaravelObjectsBindings extends ObjectsBindings
                     $stubFactory->load($stubsPath);
                 }
                 return $stubFactory;
-            }
-        ];
-        return $bindings;
+            });
     }
 
     /**
