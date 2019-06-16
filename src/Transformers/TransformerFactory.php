@@ -8,9 +8,11 @@ use Sayla\Exception\Error;
 use Sayla\Objects\Contract\Serializes;
 use Sayla\Objects\Contract\SerializesTrait;
 use Sayla\Objects\Transformers\Transformer\DatetimeTransformer;
+use Sayla\Support\Bindings\ResolvesSelf;
 
-class ValueTransformerFactory implements Serializes
+class TransformerFactory implements Serializes
 {
+    use ResolvesSelf;
     use SerializesTrait;
     public static $sharedTransformerClasses = [];
     private static $instance;
@@ -37,21 +39,21 @@ class ValueTransformerFactory implements Serializes
         ];
     }
 
-    public static function getInstance(): ValueTransformerFactory
+    public static function getInstance(): TransformerFactory
     {
-        if (!isset(self::$instance)) {
-            $transformersInDirectory = ValueTransformerFactory::getTransformersInDirectory(
-                __DIR__ . DIRECTORY_SEPARATOR . 'Transformer',
-                __NAMESPACE__ . '\\Transformer'
-            );
-            self::$instance = new self($transformersInDirectory);
-        }
-        return self::$instance;
+        return self::resolve();
     }
 
-    public static function setInstance(ValueTransformerFactory $factory)
+    /**
+     * @return array
+     */
+    public static function getNativeTransformers(): array
     {
-        self::$instance = $factory;
+        $transformersInDirectory = TransformerFactory::getTransformersInDirectory(
+            __DIR__ . DIRECTORY_SEPARATOR . 'Transformer',
+            __NAMESPACE__ . '\\Transformer'
+        );
+        return $transformersInDirectory;
     }
 
     /**
@@ -85,6 +87,11 @@ class ValueTransformerFactory implements Serializes
     public static function isSharedType(string $type): bool
     {
         return isset(self::$sharedTransformerClasses[$type]);
+    }
+
+    protected static function resolutionBinding(): string
+    {
+        return TransformerFactory::class;
     }
 
     /**
@@ -138,10 +145,10 @@ class ValueTransformerFactory implements Serializes
             $valueTransformer = new $transformerClass();
         }
 
-        if ($options) {
-            if (!$options instanceof Options) {
-                $options = new Options($options);
-            }
+        if ($options && !$options instanceof Options) {
+            $options = new Options($options);
+        } elseif (!$options) {
+            $options = new Options();
         }
         if (self::isSharedType($type) && isset(self::$sharedTransformerClasses[$type]['options'])) {
             foreach (self::$sharedTransformerClasses[$type]['options'] as $k => $v)

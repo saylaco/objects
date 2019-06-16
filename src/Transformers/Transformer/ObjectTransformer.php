@@ -3,8 +3,9 @@
 namespace Sayla\Objects\Transformers\Transformer;
 
 use Sayla\Objects\AttributableObject;
-use Sayla\Objects\Contract\SupportsDataTypeManager;
-use Sayla\Objects\Contract\SupportsDataTypeManagerTrait;
+use Sayla\Objects\Contract\DataObject\SupportsDataTypeManager;
+use Sayla\Objects\Contract\DataObject\SupportsDataTypeManagerTrait;
+use Sayla\Objects\DataObject;
 use Sayla\Objects\Transformers\AttributeValueTransformer;
 use Sayla\Objects\Transformers\ValueTransformerTrait;
 
@@ -50,7 +51,10 @@ class ObjectTransformer implements AttributeValueTransformer, SupportsDataTypeMa
     public function getVarType(): string
     {
         $dataType = $this->getDataType();
-        if (!class_exists($dataType)) {
+        if ($dataType === 'object' || empty($dataType)) {
+            return DataObject::class;
+        }
+        if (!class_exists($dataType) && $dataType) {
             return $this->options->class ?: self::getDataTypeManager()->get($dataType)->getObjectClass();
         }
         return $dataType;

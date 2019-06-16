@@ -3,7 +3,6 @@
 namespace Sayla\Objects\Transformers;
 
 use ErrorException;
-use Sayla\Exception\Error;
 use Sayla\Objects\Exception\TransformationError;
 use Throwable;
 
@@ -18,7 +17,7 @@ class Transformer
         'integer' => 'int',
     ];
     /**
-     * @var ValueTransformerFactory
+     * @var TransformerFactory
      */
     private static $factoryInstance;
     /**
@@ -35,9 +34,9 @@ class Transformer
      */
     protected $skipObjectSmashing = false;
     /**
-     * @var ValueTransformerFactory
+     * @var TransformerFactory
      */
-    private $valueFactory;
+    private $factory;
     /**
      * @var array
      */
@@ -57,9 +56,9 @@ class Transformer
     }
 
     /**
-     * @param \Sayla\Objects\Transformers\ValueTransformerFactory $resolver
+     * @param \Sayla\Objects\Transformers\TransformerFactory $resolver
      */
-    public static function setValueFactory(ValueTransformerFactory $resolver)
+    public static function setValueFactory(TransformerFactory $resolver)
     {
         self::$factoryInstance = $resolver;
     }
@@ -97,8 +96,8 @@ class Transformer
                 return $value;
             }
             return $this->callBuilder($key, $value);
-        } catch (Throwable $exception) {
-            throw new Error("Failed transformation of \${$key}", $exception);
+        } catch (Throwable $e) {
+            throw new TransformationError("Failed transformation of \${$key}", $e);
         }
     }
 
@@ -112,8 +111,12 @@ class Transformer
         if (count($this->options) == 0) {
             return $attributes;
         }
-        foreach ($attributes as $k => $v)
+        foreach ($attributes as $k => $v) {
+            if ($this->skipNonAttributes && !$this->isAttribute($k)) {
+                continue;
+            }
             $attributes[$k] = $this->build($k, $v);
+        }
         return $attributes;
     }
 
@@ -192,11 +195,21 @@ class Transformer
     }
 
     /**
-     * @return ValueTransformerFactory
+     * @return TransformerFactory
      */
-    public function getFactory(): ValueTransformerFactory
+    public function getFactory(): TransformerFactory
     {
-        return $this->valueFactory ?? ValueTransformerFactory::getInstance();
+        return $this->factory ?? TransformerFactory::resolve();
+    }
+
+    /**
+     * @param TransformerFactory $valueFactory
+     * @return \Sayla\Objects\Transformers\Transformer
+     */
+    public function setFactory(?TransformerFactory $valueFactory): self
+    {
+        $this->factory = $valueFactory;
+        return $this;
     }
 
     /**
@@ -266,16 +279,6 @@ class Transformer
     }
 
     /**
-     * @param ValueTransformerFactory $valueFactory
-     * @return \Sayla\Objects\Transformers\Transformer
-     */
-    public function setFactory(?ValueTransformerFactory $valueFactory): self
-    {
-        $this->valueFactory = $valueFactory;
-        return $this;
-    }
-
-    /**
      * @param bool $skipNonAttributes
      * @return Transformer
      */
@@ -309,7 +312,7 @@ class Transformer
             }
             return $this->callSmasher($key, $value);
         } catch (Throwable $e) {
-            throw new TransformationError('Failed transformation of $' . $key, $e);
+            throw new TransformationError("Failed transformation of \${$key}", $e);
         }
     }
 
@@ -324,6 +327,9 @@ class Transformer
             return $attributes;
         }
         foreach ($attributes as $k => $v) {
+            if ($this->skipNonAttributes && !$this->isAttribute($k)) {
+                continue;
+            }
             $attributes[$k] = $this->smash($k, $v);
         }
         return $attributes;

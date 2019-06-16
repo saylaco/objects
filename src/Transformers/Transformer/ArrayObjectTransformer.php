@@ -51,14 +51,14 @@ class ArrayObjectTransformer implements ValueTransformer, AttributeValueTransfor
     public function smash($value)
     {
         if ($value instanceof Arrayable) {
-            return $value->toArray();
+            return scalarize($value->toArray());
         }
         if ($value instanceof Jsonable) {
-            return JsonHelper::decode($value->toJson(), 1);
+            return scalarize(JsonHelper::decode($value->toJson(), 1));
         }
         if (empty($value)) {
             return [];
         }
-        return $value;
+        return scalarize($value);
     }
 }

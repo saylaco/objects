@@ -137,10 +137,9 @@ class DatetimeTransformer implements AttributeValueTransformer
      */
     public function smash($value)
     {
+        $datetime = Carbon::now();
         $format = $this->getSmashFormat();
-        if (empty($value)) {
-            $datetime = Carbon::now();
-        } elseif ($value instanceof DateTime) {
+        if ($value instanceof DateTime) {
             $datetime = $value;
         } elseif (is_string($value) && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value)) {
             $datetime = $this->newDateObject($value, 'Y-m-d');

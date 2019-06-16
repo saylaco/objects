@@ -5,7 +5,7 @@ namespace Sayla\Objects;
 use Psr\Container\ContainerInterface;
 use Sayla\Objects\DataType\DataTypeManager;
 use Sayla\Objects\Stores\StoreManager;
-use Sayla\Objects\Transformers\ValueTransformerFactory;
+use Sayla\Objects\Transformers\TransformerFactory;
 use Sayla\Support\Bindings\BindingProvider;
 
 
@@ -29,15 +29,12 @@ class ObjectsBindings extends BindingProvider
                     return new DataTypeManager(new StoreManager($container));
                 }
             ],
-            'transformerValues' => [
-                ValueTransformerFactory::class,
+            'dataTransformer' => [
+                TransformerFactory::class,
                 function (ContainerInterface $container) {
-                    $factory = ValueTransformerFactory::getInstance();
+                    $factory = new TransformerFactory(TransformerFactory::getNativeTransformers());
                     $factory->setContainer($container);
                     return $factory;
-                },
-                function (ContainerInterface $container) {
-                    ValueTransformerFactory::setInstance($container->get(ValueTransformerFactory::class));
                 }
             ]
         ];

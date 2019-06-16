@@ -42,7 +42,7 @@ class ObjectCollectionTransformer implements AttributeValueTransformer
 
     public function getVarType(): string
     {
-        return get_class($this->newCollectionInstance()) . '|' . $this->getDataType() . '[]';
+        return qualify_var_type($this->options->class ?: ObjectCollection::class) . '|' . $this->getDataType() . '[]';
     }
 
     /**
