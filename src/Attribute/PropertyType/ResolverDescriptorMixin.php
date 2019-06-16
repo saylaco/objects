@@ -2,8 +2,9 @@
 
 namespace Sayla\Objects\Attribute\PropertyType;
 
-use Sayla\Objects\Contract\AttributeResolver;
+use Sayla\Objects\Contract\Attributes\AttributeResolver;
 use Sayla\Objects\Exception\AttributeResolverNotFound;
+use Sayla\Objects\ObjectCollection;
 use Sayla\Util\Mixin\Mixin;
 
 class ResolverDescriptorMixin implements Mixin

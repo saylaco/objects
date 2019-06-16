@@ -2,7 +2,7 @@
 
 namespace Sayla\Objects\Attribute\Resolver;
 
-use Sayla\Objects\Contract\AttributeResolver;
+use Sayla\Objects\Contract\Attributes\AttributeResolver;
 use Sayla\Objects\DataObject;
 
 class ResolverDelegate implements AttributeResolver
@@ -10,13 +10,13 @@ class ResolverDelegate implements AttributeResolver
     /** @var string */
     protected $attributeName;
     /**
-     * @var \Sayla\Objects\Contract\AttributeResolver
+     * @var \Sayla\Objects\Contract\Attributes\AttributeResolver
      */
     protected $multipleValueResolver;
     /** @var string */
     protected $owningObjectClass;
     /**
-     * @var \Sayla\Objects\Contract\AttributeResolver
+     * @var \Sayla\Objects\Contract\Attributes\AttributeResolver
      */
     protected $singleValueResolver;
 

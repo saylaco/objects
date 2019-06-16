@@ -2,8 +2,8 @@
 
 namespace Sayla\Objects\Attribute\PropertyType;
 
-use Sayla\Objects\Attribute\AttributePropertyType;
-use Sayla\Objects\Contract\NormalizesPropertyValue;
+use Sayla\Objects\Contract\PropertyTypes\AttributePropertyType;
+use Sayla\Objects\Contract\PropertyTypes\NormalizesPropertyValue;
 use Sayla\Util\Mixin\Mixin;
 
 class Map implements AttributePropertyType, NormalizesPropertyValue
@@ -22,7 +22,7 @@ class Map implements AttributePropertyType, NormalizesPropertyValue
                 $context->attributes = $context->descriptor->extract($context->attributes);
                 return $next($context);
             },
-            self::PROVIDER_MIXIN => function (string $dataType, array $properties): Mixin {
+            self::PROVIDER_DESCRIPTOR_MIXIN => function (string $dataType, array $properties): Mixin {
                 return new MapDescriptorMixin($properties);
             }
         ];

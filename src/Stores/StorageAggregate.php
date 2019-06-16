@@ -2,8 +2,8 @@
 
 namespace Sayla\Objects\Stores;
 
-use Sayla\Objects\Contract\ObjectStore;
 use Sayla\Objects\Contract\Storable;
+use Sayla\Objects\Contract\Stores\ObjectStore;
 
 class StorageAggregate implements ObjectStore
 {

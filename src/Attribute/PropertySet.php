@@ -5,9 +5,9 @@ namespace Sayla\Objects\Attribute;
 use ArrayIterator;
 use Sayla\Helper\Data\BaseHashMap;
 use Sayla\Helper\Data\Contract\FreezableTrait;
-use Sayla\Objects\Contract\Property as PropertyInterface;
+use Sayla\Objects\Contract\Attributes\Property;
 
-class PropertySet extends BaseHashMap implements PropertyInterface
+class PropertySet extends BaseHashMap implements Property
 {
     use FreezableTrait;
     /** @var string */
@@ -20,7 +20,9 @@ class PropertySet extends BaseHashMap implements PropertyInterface
     public function __construct(string $name, array $value)
     {
         $this->name = $name;
-        $this->fill($value);
+        $this->fill(array_replace_key($value, function (Property $property) {
+            return $property->getName();
+        }));
         $this->freeze();
     }
 

@@ -3,7 +3,7 @@
 namespace Sayla\Objects\Stores\FileStore;
 
 use BadMethodCallException;
-use Sayla\Objects\Contract\StorableObject;
+use Sayla\Objects\Contract\DataObject\StorableObject;
 
 class ReadFileDataStore extends FileDataStore
 {

@@ -4,10 +4,10 @@ namespace Sayla\Objects\Attribute\PropertyType;
 
 use Sayla\Data\DotArray;
 use Sayla\Exception\Error;
-use Sayla\Objects\Attribute\AttributePropertyType;
 use Sayla\Objects\Attribute\Property;
-use Sayla\Objects\Contract\ModifiesAttributeDescriptor;
-use Sayla\Objects\Contract\NormalizesPropertyValue;
+use Sayla\Objects\Contract\PropertyTypes\AttributePropertyType;
+use Sayla\Objects\Contract\PropertyTypes\ModifiesAttributeDescriptor;
+use Sayla\Objects\Contract\PropertyTypes\NormalizesPropertyValue;
 
 class PropertyTypeFactory
 {
@@ -63,11 +63,8 @@ class PropertyTypeFactory
             if ($value === null) {
                 continue;
             }
-            if ($key === Type::NAME) {
-                $attributeType = $value['type'];
-            }
 
-            $properties[$propertyType->getName()] = new Property($propertyType->getName(), $value);
+            $properties[$propertyType->getName()] = new Property($objectClass, $propertyType->getName(), $value);
         }
         if (filled($modifyingPropTypes)) {
             $modifiedPropertyValues = new DotArray();
@@ -88,8 +85,9 @@ class PropertyTypeFactory
                     );
                     if ($value === null) {
                         unset($properties[$propertyName]);
+                    } else {
+                        $properties[$propertyName] = new Property($objectClass, $propertyName, $value);
                     }
-                    $properties[$propertyName] = new Property($propertyName, $value);
                 }
             }
         }
@@ -104,6 +102,10 @@ class PropertyTypeFactory
             case Access::NAME:
             case in_array($key, Access::IDENTITY_PROPERTIES):
                 return new Access();
+            case  Rules::NAME:
+                return new Rules();
+            case  Owned::NAME:
+                return new Owned();
             case DefaultValue::NAME:
                 return new DefaultValue();
             case Map::NAME:
@@ -133,37 +135,22 @@ class PropertyTypeFactory
 
     public function getProviders(array $keys): array
     {
-        $providers = [];
+        $providers = [
+            Access::NAME => Access::getProviders(),
+            Resolver::NAME => Resolver::getProviders(),
+            Map::NAME => Map::getProviders(),
+            Transform::NAME => Transform::getProviders(),
+            Rules::NAME => Rules::getProviders(),
+            Owned::NAME => Owned::getProviders(),
+        ];
         foreach ($keys as $key) {
             switch ($key) {
-                case Access::NAME:
-                case in_array($key, Access::IDENTITY_PROPERTIES):
-                    $providers[Access::NAME] = Access::getProviders();
-                    break;
                 case DefaultValue::NAME:
                     $providers[$key] = DefaultValue::getProviders();
-                    break;
-                case Map::NAME:
-                    $providers[$key] = Map::getProviders();
-                    break;
-                case Resolver::NAME:
-                    $providers[$key] = Resolver::getProviders();
-                    break;
-                case Transform::NAME:
-                    $providers[$key] = Transform::getProviders();
                     break;
             }
         }
 
-        if (!isset($providers[Access::NAME])) {
-            $providers[Access::NAME] = Access::getProviders();
-        }
-        if (!isset($providers[Resolver::NAME])) {
-            $providers[Resolver::NAME] = Resolver::getProviders();
-        }
-        if (!isset($providers[Transform::NAME])) {
-            $providers[Transform::NAME] = Transform::getProviders();
-        }
         return $providers;
     }
 

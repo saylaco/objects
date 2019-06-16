@@ -2,11 +2,14 @@
 
 namespace Sayla\Objects\Contract;
 
+use Sayla\Objects\Contract\Attributes\Attributable;
+use Sayla\Objects\Contract\DataObject\SupportsDataType;
 use Sayla\Objects\DataType\DataType;
 use Serializable;
 
-interface IDataObject extends Attributable, Serializable
+interface IDataObject extends Attributable, Serializable, SupportsDataType
 {
+
     public static function dataType(): DataType;
 
     public static function dataTypeName(): string;
@@ -40,9 +43,5 @@ interface IDataObject extends Attributable, Serializable
 
     public function toScalarArray();
 
-    public function toVisibleArray(): array;
-
     public function toVisibleObject();
-
-    public function toVisibleScalarArray();
 }

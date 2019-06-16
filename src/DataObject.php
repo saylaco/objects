@@ -2,10 +2,10 @@
 
 namespace Sayla\Objects;
 
+use Sayla\Objects\Contract\DataObject\SupportsDataTypeManager;
+use Sayla\Objects\Contract\DataObject\SupportsDataTypeManagerTrait;
 use Sayla\Objects\Contract\IDataObject;
-use Sayla\Objects\Contract\NonCachableAttribute;
-use Sayla\Objects\Contract\SupportsDataTypeManager;
-use Sayla\Objects\Contract\SupportsDataTypeManagerTrait;
+use Sayla\Objects\Contract\Storable;
 use Sayla\Objects\Contract\Triggerable;
 use Sayla\Objects\Contract\TriggerableTrait;
 use Sayla\Objects\DataType\DataType;

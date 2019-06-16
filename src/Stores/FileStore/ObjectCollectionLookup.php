@@ -2,7 +2,7 @@
 
 namespace Sayla\Objects\Stores\FileStore;
 
-use Sayla\Objects\Contract\Lookup;
+use Sayla\Objects\Contract\Stores\Lookup;
 use Sayla\Objects\DataType\DataTypeManager;
 use Sayla\Objects\ObjectCollection;
 

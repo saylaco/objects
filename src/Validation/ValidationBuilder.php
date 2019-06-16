@@ -4,9 +4,8 @@ namespace Sayla\Objects\Validation;
 
 use Illuminate\Contracts\Validation\Factory;
 use Illuminate\Contracts\Validation\Validator;
-use Illuminate\Validation\Validator as IlluminateValidator;
 use Sayla\Data\ArrayObject;
-use Sayla\Objects\Exception\NamedValidationException;
+use Sayla\Objects\Exception\EntityValidationException;
 
 class ValidationBuilder
 {

@@ -30,7 +30,7 @@ trait TriggerableTrait
     /**
      * @param string $name name of trigger
      * @param mixed ...$args
-     * @return int
+     * @return mixed[]
      * @throws \Sayla\Objects\Exception\TriggerError
      */
     public function __invoke(string $name, ...$args)
@@ -41,23 +41,21 @@ trait TriggerableTrait
         } else {
             ++self::$calledTriggers[$dataTypeName][$name];
         }
-        $fired = 0;
-        $this->dispatchTrigger($name, $this);
+        $results = $this->dispatchTrigger($name, $this);
         if ($this->getTriggerCount($name) > 0) {
             $args['object'] = $this;
             $triggers = $this->triggers[$name];
             foreach ($triggers as $i => $trigger) {
                 try {
-                    call_user_func_array($trigger, $args);
+                    $results['instance'][] = call_user_func_array($trigger, $args);
                     unset($this->triggers[$name][$i]);
-                    $fired++;
                 } catch (Throwable $exception) {
                     $fullTriggerName = $dataTypeName . '.*' . $name;
                     throw new TriggerError($fullTriggerName, $exception);
                 }
             }
         }
-        return $fired;
+        return $results;
     }
 
     /**
@@ -75,14 +73,17 @@ trait TriggerableTrait
     /**
      * @param string $triggerName
      * @param static $instance
+     * @return array
      */
     protected function dispatchTrigger(string $triggerName, $instance)
     {
+        $results = ['instance' => [], 'dispatcher' => null];
         $triggerMethod = self::TRIGGER_PREFIX . $triggerName;
         if (method_exists($instance, $triggerMethod)) {
-            $instance::$triggerMethod($instance);
+            $results['instance'][] = $instance::$triggerMethod($instance);
         }
-        $this->descriptor()->dispatcher()->fire($triggerName, [$this]);
+        $results['dispatcher'] = static::descriptor()->dispatcher()->fire($triggerName, [$this]);
+        return $results;
     }
 
     /**
@@ -95,6 +96,14 @@ trait TriggerableTrait
             return 0;
         }
         return count($this->triggers[$triggerName]);
+    }
+
+    public function hasTriggerListeners(string $triggerName): bool
+    {
+        $triggerMethod = self::TRIGGER_PREFIX . $triggerName;
+        return isset($this->triggers[$triggerName])
+            || method_exists(static::class, $triggerMethod)
+            || static::descriptor()->dispatcher()->hasListeners($triggerName);
     }
 
 }

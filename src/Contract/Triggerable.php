@@ -6,10 +6,8 @@ interface Triggerable
 {
 
     public function __invoke(string $name, ...$arguments);
+    
+    public function getTriggerCount(string $triggerName): int;
 
-    /**
-     * @param string $triggerKey
-     * @return int
-     */
-    public function getTriggerCount(string $triggerKey): int;
+    public function hasTriggerListeners(string $triggerName): bool;
 }

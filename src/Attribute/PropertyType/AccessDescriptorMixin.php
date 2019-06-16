@@ -6,12 +6,12 @@ use Sayla\Util\Mixin\Mixin;
 
 class AccessDescriptorMixin implements Mixin
 {
-    /** @var \Illuminate\Support\Collection|\Sayla\Objects\Contract\Property[] */
+    /** @var \Illuminate\Support\Collection|\Sayla\Objects\Contract\Attributes\Property[] */
     private $access;
 
     /**
      * DataTypeDescriptor constructor.
-     * @param \Illuminate\Support\Collection|\Sayla\Objects\Contract\Property[] $access
+     * @param \Illuminate\Support\Collection|\Sayla\Objects\Contract\Attributes\Property[] $access
      */
     public function __construct(array $access)
     {

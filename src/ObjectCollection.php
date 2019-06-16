@@ -2,17 +2,20 @@
 
 namespace Sayla\Objects;
 
+use Illuminate\Contracts\Support\Responsable;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
 use Sayla\Data\JavascriptObject;
 use Sayla\Exception\InvalidValue;
-use Sayla\Objects\Contract\NonCachableAttribute;
+use Sayla\Helper\Data\Contract\Collectionable;
+use Sayla\Objects\Contract\DataObject\ResponsableObject;
 use Sayla\Objects\DataType\DataTypeDescriptor;
 use Sayla\Objects\DataType\DataTypeManager;
 
 /**
  * @method DataObject[] getIterator
  */
-class ObjectCollection extends Collection
+class ObjectCollection extends Collection implements Responsable, Collectionable
 {
     protected static $enforceItemType = true;
     protected $allowNullItems = false;

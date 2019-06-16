@@ -6,7 +6,7 @@ use DeepCopy\DeepCopy;
 use DeepCopy\TypeFilter\ReplaceFilter;
 use DeepCopy\TypeMatcher\TypeMatcher;
 use Sayla\Helper\Data\SimpleObject;
-use Sayla\Objects\Contract\Attributable;
+use Sayla\Objects\Contract\Attributes\Attributable;
 
 class Copier
 {

@@ -2,13 +2,12 @@
 
 namespace Sayla\Objects\Attribute\Resolver;
 
-use Sayla\Objects\Contract\AttributeResolver;
-use Sayla\Objects\Contract\AttributeResolverTrait;
-use Sayla\Objects\Contract\NonCachableAttribute;
+use Sayla\Objects\Contract\Attributes\AttributeResolver;
+use Sayla\Objects\Contract\Attributes\AttributeResolverTrait;
 use Sayla\Objects\DataObject;
 use Sayla\Util\Evaluator;
 
-class AliasResolver implements AttributeResolver, NonCachableAttribute
+class AliasResolver implements AttributeResolver
 {
     use AttributeResolverTrait;
     /** @var string */
@@ -21,9 +20,8 @@ class AliasResolver implements AttributeResolver, NonCachableAttribute
      * @param string $dependsOn
      * @param string $expression
      */
-    public function __construct(string $expression, string $dependsOn = null)
+    public function __construct(string $expression)
     {
-        $this->dependsOn = $dependsOn;
         $this->expression = $expression;
     }
 
@@ -34,9 +32,6 @@ class AliasResolver implements AttributeResolver, NonCachableAttribute
      */
     public function resolve(DataObject $owningObject)
     {
-        if (isset($this->dependsOn) && !isset($owningObject[$this->dependsOn])) {
-            $owningObject[$this->dependsOn];
-        }
         return Evaluator::toEval('$object->' . $this->expression, ['object' => $owningObject]);
     }
 

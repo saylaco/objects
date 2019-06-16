@@ -4,7 +4,9 @@ namespace Sayla\Objects\Support\Illuminate;
 
 use Faker\Generator as FakerGenerator;
 use Illuminate\Contracts\Container\Container;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Validation\Factory;
+use Sayla\Objects\Attribute\PropertyType\OwnedDescriptorMixin;
 use Sayla\Objects\Builder\Builder;
 use Sayla\Objects\DataType\DataTypeManager;
 use Sayla\Objects\ObjectsBindings;

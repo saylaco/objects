@@ -2,7 +2,9 @@
 
 namespace Sayla\Objects\Attribute\PropertyType;
 
-use Sayla\Objects\Attribute\AttributePropertyType;
+use Sayla\Objects\Contract\IDataObject;
+use Sayla\Objects\Contract\PropertyTypes\AttributePropertyType;
+use Sayla\Objects\DataType\DataTypeManager;
 use Sayla\Util\Mixin\Mixin;
 
 class Transform implements AttributePropertyType
@@ -28,10 +30,11 @@ class Transform implements AttributePropertyType
                 $transformer = $descriptor->getTransformer()->skipNonAttributes();
                 foreach ($context->attributes as $k => $v) {
                     $context->attributes[$k] = $transformer->smash($k, $v);
+
                 }
                 return $next($context);
             },
-            self::PROVIDER_MIXIN => function (string $dataType, array $properties): Mixin {
+            self::PROVIDER_DESCRIPTOR_MIXIN => function (string $dataType, array $properties): Mixin {
                 return new TransformationDescriptorMixin($properties);
             }
         ];
@@ -50,7 +53,17 @@ class Transform implements AttributePropertyType
     public function getPropertyValue(string $attributeName, array $value, string $attributeType): ?array
     {
         if (!isset($value['type'])) {
-            $value['type'] = $attributeType;
+            $isArray = ends_with($attributeType, '[]');
+            $possibleDataObjectName = $isArray ? str_before($attributeType, '[]') : $attributeType;
+            if (
+                is_subclass_of($possibleDataObjectName, IDataObject::class, true)
+                || DataTypeManager::getInstance()->has($possibleDataObjectName)
+            ) {
+                $value['type'] = $isArray ? 'objectCollection' : 'object';
+                $value['dataType'] = $possibleDataObjectName;
+            } else {
+                $value['type'] = $attributeType;
+            }
         }
         return $value;
     }

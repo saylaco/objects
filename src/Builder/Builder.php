@@ -4,7 +4,7 @@ namespace Sayla\Objects\Builder;
 
 use Sayla\Objects\DataType\DataType;
 use Sayla\Objects\ObjectDispatcher;
-use Sayla\Objects\Transformers\ValueTransformerFactory;
+use Sayla\Objects\Transformers\TransformerFactory;
 use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 

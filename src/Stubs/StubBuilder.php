@@ -9,7 +9,6 @@ use Sayla\Objects\Contract\Keyable;
 use Sayla\Objects\DataObject;
 use Sayla\Objects\DataType\DataTypeManager;
 use Sayla\Objects\ObjectCollection;
-use Sayla\Objects\StorableTrait;
 
 class StubBuilder
 {

@@ -3,15 +3,15 @@
 namespace Sayla\Objects\Attribute\PropertyType;
 
 use Sayla\Objects\Transformers\Transformer;
-use Sayla\Objects\Transformers\ValueTransformerFactory;
+use Sayla\Objects\Transformers\TransformerFactory;
 use Sayla\Util\Mixin\Mixin;
 
 class TransformationDescriptorMixin implements Mixin
 {
     private $transformations = [];
     private $transformer;
-    /** @var \Sayla\Objects\Transformers\ValueTransformerFactory */
-    private $valueFactory;
+    /** @var \Sayla\Objects\Transformers\TransformerFactory */
+    private $factory;
 
     /**
      * @param \Sayla\Objects\Attribute\Property[] $transformations

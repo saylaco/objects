@@ -5,11 +5,12 @@ namespace Sayla\Objects\Stores;
 use Closure;
 use Illuminate\Contracts\Container\Container;
 use InvalidArgumentException;
-use Sayla\Objects\Contract\ConfigurableStore;
-use Sayla\Objects\Contract\ObjectStore;
+use Sayla\Objects\Contract\Stores\ConfigurableStore;
+use Sayla\Objects\Contract\Stores\ObjectStore;
 use Sayla\Objects\Stores\FileStore\FileDataStore;
 use Sayla\Objects\Stores\FileStore\ReadFileDataStore;
 use Sayla\Objects\Support\Illuminate\EloquentStore;
+use Sayla\Support\Bindings\ResolvesSelf;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class StoreManager

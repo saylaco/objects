@@ -4,14 +4,15 @@ namespace Sayla\Objects\Support\Illuminate;
 
 use Illuminate\Container\Container;
 use Illuminate\Database\Eloquent\Model;
-use Sayla\Objects\Contract\ConfigurableStore;
-use Sayla\Objects\Contract\ObjectStore;
-use Sayla\Objects\Contract\StorableObject;
+use Sayla\Objects\Contract\DataObject\StorableObject;
+use Sayla\Objects\Contract\Stores\ConfigurableStore;
+use Sayla\Objects\Contract\Stores\ModifiesObjectBehavior;
+use Sayla\Objects\Contract\Stores\ObjectStore;
 use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 
-class EloquentStore implements ObjectStore, ConfigurableStore
+class EloquentStore implements ObjectStore, ConfigurableStore, ModifiesObjectBehavior
 {
     /** @var Model */
     protected $model;
@@ -68,13 +69,18 @@ class EloquentStore implements ObjectStore, ConfigurableStore
 
     /**
      * @param Model $model
-     * @param \Sayla\Objects\Contract\StorableObject $object
+     * @param \Sayla\Objects\Contract\DataObject\StorableObject $object
      * @return Model
      */
     protected function deleteModel($model, $object)
     {
         $model->delete();
         return $model->getAttributes();
+    }
+
+    public function exists(string $key): bool
+    {
+        return $this->model->newQuery()->where($this->model->getKeyName(), $key)->exists();
     }
 
     /**

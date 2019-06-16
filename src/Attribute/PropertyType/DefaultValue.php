@@ -2,7 +2,7 @@
 
 namespace Sayla\Objects\Attribute\PropertyType;
 
-use Sayla\Objects\Attribute\AttributePropertyType;
+use Sayla\Objects\Contract\PropertyTypes\AttributePropertyType;
 use Sayla\Util\Mixin\Mixin;
 
 class DefaultValue implements AttributePropertyType
@@ -13,11 +13,16 @@ class DefaultValue implements AttributePropertyType
     {
         return [
             self::PROVIDER_HYDRATION => function ($context, callable $next) {
-                $mappedData = array_merge($context->descriptor->getDefaultValues(), $context->attributes);
-                $context->attributes = array_filter($mappedData);
+                $defaults = array_diff_key(
+                    $context->descriptor->getDefaultValues(),
+                    array_filter($context->attributes)
+                );
+                if (filled($defaults)) {
+                    $context->attributes = array_merge($context->attributes, $defaults);
+                }
                 return $next($context);
             },
-            self::PROVIDER_MIXIN => function (string $dataType, array $properties): Mixin {
+            self::PROVIDER_DESCRIPTOR_MIXIN => function (string $dataType, array $properties): Mixin {
                 return new DefaultDescriptorMixin(array_filter($properties));
             }
         ];

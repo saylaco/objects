@@ -5,21 +5,30 @@ namespace Sayla\Objects\Builder;
 use Nette\PhpGenerator\ClassType;
 use Nette\PhpGenerator\PhpNamespace;
 use Nette\PhpGenerator\PsrPrinter;
+use ReflectionClass;
 use Sayla\Exception\Error;
 use Sayla\Objects\Attribute\PropertyType\TransformationDescriptorMixin;
+use Sayla\Objects\Contract\Attributes\AssociationResolver;
+use Sayla\Objects\Contract\DataObject\StorableObject;
 use Sayla\Objects\Contract\IDataObject;
-use Sayla\Objects\Contract\StorableObject;
+use Sayla\Objects\Contract\Stores\ModifiesObjectBehavior;
 use Sayla\Objects\DataType\DataType;
 use Sayla\Objects\DataType\DataTypeDescriptor;
+use Sayla\Objects\DataType\DataTypeManager;
 use Sayla\Objects\StorableTrait;
+use Sayla\Objects\Stores\StoreManager;
 use Sayla\Objects\Transformers\AttributeValueTransformer;
+use Throwable;
 
 class ClassWriter
 {
+    private static $reflectionClasses = [];
     protected $classNamespace;
     protected $codeOutputDirectory;
     private $descriptorClassSuffix = 'Descriptor';
     private $interfaceSuffix = 'DT';
+    /** @var \Sayla\Objects\Stores\StoreManager */
+    private $storeManager;
     private $traitSuffix = 'Trait';
 
     /**
@@ -35,7 +44,8 @@ class ClassWriter
 
     public function __invoke(DataType $dataType)
     {
-        $descriptorClass = $this->writeDescriptorClass($dataType->getDescriptor());
+        $descriptor = $dataType->getDescriptor();
+        $descriptorClass = $this->writeDescriptorClass($descriptor);
         $classes = $this->writeObjectClass($dataType, $descriptorClass->getName());
         $classes['desc'] = $descriptorClass;
         $this->createFile($classes['dt']);
@@ -51,8 +61,48 @@ class ClassWriter
     protected function addAttributeAnnotations(DataType $dataType, ClassType $class): void
     {
         /** @var \Sayla\Objects\Attribute\PropertyType\TransformationDescriptorMixin $transformerMixin */
-        $transformerMixin = $dataType->getDescriptor()->getMixin(TransformationDescriptorMixin::class);
+        $descriptor = $dataType->getDescriptor();
+        $transformerMixin = $descriptor->getMixin(TransformationDescriptorMixin::class);
         $transformer = $transformerMixin->getTransformer();
+        $varTypes = [];
+
+        foreach ($descriptor->getResolvable() as $attributeName) {
+            $resolver = $descriptor->getResolver($attributeName);
+            if ($resolver instanceof AssociationResolver) {
+                try {
+                    $varType = qualify_var_type(DataTypeManager::resolve()
+                        ->getDescriptor($resolver->getAssociatedDataType())
+                        ->getObjectClass());
+                } catch (Throwable $throwable) {
+                    $varType = qualify_var_type($resolver->getAssociatedDataType());
+                }
+
+                if (!$resolver->isSingular()) {
+                    $varType .= '[]';
+                }
+
+                $varTypes[$attributeName] = $varType;
+            }
+        }
+
+        foreach ($descriptor->getResolvable() as $attributeName) {
+            $resolver = $descriptor->getResolver($attributeName);
+            if ($resolver instanceof AssociationResolver) {
+                try {
+                    $varType = qualify_var_type(DataTypeManager::resolve()
+                        ->getDescriptor($resolver->getAssociatedDataType())
+                        ->getObjectClass());
+                } catch (Throwable $throwable) {
+                    $varType = qualify_var_type($resolver->getAssociatedDataType());
+                }
+
+                if (!$resolver->isSingular()) {
+                    $varType .= '[]';
+                }
+                $varTypes[$attributeName] = $varType;
+            }
+        }
+
         foreach (array_sort($transformer->getAttributeNames()) as $attributeName) {
             try {
                 $valueTransformer = $transformer->getValueTransformer($attributeName);
@@ -66,8 +116,10 @@ class ClassWriter
             } catch (Error $exception) {
                 $varType = $transformer->getAttributeOptions()[$attributeName]['type'];
             }
-            $class->addComment('@property ' . $varType . ' ' . $attributeName);
+            $varTypes[$attributeName] = $varType;
         }
+        foreach ($varTypes as $attributeName => $varType)
+            $class->addComment('@property ' . $varType . ' ' . $attributeName);
     }
 
     protected function createFile(ClassType ...$classes): void
@@ -79,6 +131,24 @@ class ClassWriter
             $code .= $printer->printClass($class) . PHP_EOL;
         }
         file_put_contents("{$this->codeOutputDirectory}/{$classes[0]->getName()}.php", $code);
+    }
+
+    /**
+     * @return \Sayla\Objects\Stores\StoreManager
+     */
+    protected function getStoreManager(): StoreManager
+    {
+        return $this->storeManager ?? StoreManager::resolve();
+    }
+
+    /**
+     * @param \Sayla\Objects\Stores\StoreManager $storeManager
+     * @return ClassWriter
+     */
+    public function setStoreManager(StoreManager $storeManager): ClassWriter
+    {
+        $this->storeManager = $storeManager;
+        return $this;
     }
 
     /**
@@ -118,43 +188,7 @@ class ClassWriter
         $class->setFinal(true)->setExtends(qualify_var_type(DataTypeDescriptor::class));
         $annotatedMixins = [];
         foreach ($descriptor->getMixins()->getMixinMethods() as $mixin) {
-            if (isset($class->methods[$mixin['name']])) {
-                $annotatedMixins[] = $mixin['class'];
-                continue;
-            }
-
-            $args = [];
-            $method = $class->addMethod($mixin['name']);
-            foreach ($mixin['parameters'] as $parameter) {
-                $param = $method->addParameter($parameter['name'])->setTypeHint($parameter['type']);
-                if ($parameter['optional']) {
-                    $param->setDefaultValue(null);
-                }
-                $args[] = '$' . $parameter['name'];
-            }
-            $delegationCallCode = '$mixin->' . $mixin['methodName'] . '(' . join(', ', $args) . ');';
-            $lines = [
-                '/**  @var \\' . $mixin['class'] . ' $mixin */',
-                '$mixin = $this->mixins[' . var_str($mixin['mixinName']) . '];',
-            ];
-            if (
-                $mixin['returnType'] !== 'void'
-                && (
-                    ($mixin['returnType'] && !str_is('set[A-Z]', $mixin['name']))
-                    || !str_is(['is[A-Z]', 'get[A-Z]'], $mixin['name'])
-                )
-            ) {
-                $lines[] = 'return ' . $delegationCallCode;
-                $method->setReturnType($mixin['returnType']);
-            } else {
-
-                $lines[] = $delegationCallCode;
-                $lines[] = 'return $this;';
-                $method->setReturnType('self');
-            }
-            $method->setBody(
-                join(PHP_EOL, $lines)
-            );
+            $annotatedMixins[] = $mixin['class'];
         }
         foreach (array_unique($annotatedMixins) as $mixinClass)
             $class->addComment('@mixin \\' . $mixinClass);
@@ -176,8 +210,6 @@ class ClassWriter
             $this->classNamespace
         );
         $interface->setType(ClassType::TYPE_INTERFACE);
-        foreach ($dataType->getInterfaces() as $interfaceClass)
-            $interface->addExtend(qualify_var_type($interfaceClass));
 
         if ($dataType->hasStore()) {
             $interface->addExtend(qualify_var_type(StorableObject::class));
@@ -196,19 +228,56 @@ class ClassWriter
             ->setBody('return ' . var_str($dataType->getName()) . ';')
             ->setVisibility(ClassType::VISIBILITY_PUBLIC);
         $trait->addComment("@method static {$descriptorClass} descriptor()");
-        foreach ($dataType->getTraits() as $traitClass)
-            $trait->addTrait(qualify_var_type($traitClass));
+
+        $traits = $dataType->getTraits();
+        $interfaces = $dataType->getInterfaces();
 
         if ($dataType->hasStore()) {
-            $trait->addTrait(qualify_var_type(StorableTrait::class));
+            $traits[] = StorableTrait::class;
         }
 
+
+        if (filled($storeDriver = $dataType->getStoreDriver())) {
+            /** @var string|ModifiesObjectBehavior $storeClass */
+            $storeClass = $this->getStoreManager()->getDriverClass($storeDriver);
+
+            if (is_subclass_of($storeClass, ModifiesObjectBehavior::class)) {
+                foreach ($storeClass::getObjectBehavior() as $behavior) {
+                    $behaviorClass = $this->getReflection($behavior);
+                    if ($behaviorClass->isTrait()) {
+                        $traits[] = $behaviorClass->getName();
+                    } elseif ($behaviorClass->isInterface()) {
+                        $interfaces[] = $behaviorClass->getName();
+                    }
+                }
+            }
+        }
+
+        foreach (array_unique($interfaces) as $interfaceClass) {
+            $interface->addExtend(qualify_var_type($interfaceClass));
+        }
+
+        foreach (array_unique($traits) as $traitClass)
+            $trait->addTrait(qualify_var_type($traitClass));
 
         if ($dataType->getDescriptor()->hasMixin(TransformationDescriptorMixin::class)) {
             $this->addAttributeAnnotations($dataType, $trait);
             $this->addAttributeAnnotations($dataType, $interface);
         }
         return $classes;
+    }
+
+    /**
+     * @param $class
+     * @return \ReflectionClass
+     * @throws \ReflectionException
+     */
+    private function getReflection($class): ReflectionClass
+    {
+        if (!is_string($class)) {
+            $class = get_class($class);
+        }
+        return self::$reflectionClasses[$class] ?? self::$reflectionClasses[$class] = new ReflectionClass($class);
     }
 
     /**

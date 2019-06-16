@@ -2,7 +2,7 @@
 
 namespace Sayla\Objects\Stores\FileStore;
 
-use Sayla\Objects\Contract\LookableTrait;
+use Sayla\Objects\Contract\DataObject\LookableTrait;
 use Sayla\Objects\Stores\FileStore;
 
 /**

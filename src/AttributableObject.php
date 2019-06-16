@@ -3,7 +3,7 @@
 namespace Sayla\Objects;
 
 use ArrayIterator;
-use Sayla\Objects\Contract\Attributable;
+use Sayla\Objects\Contract\Attributes\Attributable;
 
 class AttributableObject implements Attributable
 {
@@ -144,15 +144,6 @@ class AttributableObject implements Attributable
         return array_key_exists($attributeName, $this->attributes);
     }
 
-    /**
-     * @param string $attributeName
-     * @return bool
-     */
-    public function isAttributeValueSet(string $attributeName): bool
-    {
-        return isset($this->attributes[$attributeName]);
-    }
-
     protected function isRetrievableAttribute(string $attributeName)
     {
         return isset($this->attributes[$attributeName])
@@ -230,7 +221,10 @@ class AttributableObject implements Attributable
     {
         if (self::class != static::class
             && $this->hasAttributeSetter($attributeName)) {
-            $this->{$this->getAttributeSetter($attributeName)}($value);
+            $newValue = $this->{$this->getAttributeSetter($attributeName)}($value);
+            if ($newValue !== null) {
+                $this->setRawAttribute($attributeName, $newValue);
+            }
         } else {
             $this->setRawAttribute($attributeName, $value);
         }

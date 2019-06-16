@@ -2,8 +2,8 @@
 
 namespace Sayla\Objects\Attribute\PropertyType;
 
-use Sayla\Objects\Attribute\AttributePropertyType;
-use Sayla\Objects\Contract\NormalizesPropertyValue;
+use Sayla\Objects\Contract\PropertyTypes\AttributePropertyType;
+use Sayla\Objects\Contract\PropertyTypes\NormalizesPropertyValue;
 use Sayla\Util\Mixin\Mixin;
 
 class Access implements AttributePropertyType, NormalizesPropertyValue
@@ -14,7 +14,7 @@ class Access implements AttributePropertyType, NormalizesPropertyValue
     public static function getProviders(): array
     {
         return [
-            self::PROVIDER_MIXIN => function (string $dataType, array $properties): Mixin {
+            self::PROVIDER_DESCRIPTOR_MIXIN => function (string $dataType, array $properties): Mixin {
                 return new AccessDescriptorMixin($properties);
             }
         ];
@@ -27,8 +27,10 @@ class Access implements AttributePropertyType, NormalizesPropertyValue
 
     public function getPropertyValue(string $attributeName, array $value, string $attributeType): array
     {
+        $visible = $value['visible'] == true;
         return [
-            'visible' => $value['visible'] == true,
+            'visible' => $visible,
+            'hidden' => !$visible,
             'readable' => $value['readable'] == true,
             'writable' => $value['writable'] == true,
         ];

@@ -2,7 +2,7 @@
 
 namespace Sayla\Objects\Attribute;
 
-use Sayla\Objects\Contract\Property;
+use Sayla\Objects\Contract\Attributes\Property;
 
 class Attribute extends PropertySet
 {
@@ -15,7 +15,6 @@ class Attribute extends PropertySet
      * @param string $typeHandle
      * @param string $name
      */
-    public function __construct(string $typeHandle, string $name, array $value)
     {
         $this->typeHandle = $typeHandle;
         parent::__construct($name, $value);
