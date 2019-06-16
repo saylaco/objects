@@ -46,6 +46,16 @@ class ValidationBuilder
     }
 
     /**
+     * @param array $rules
+     * @return $this
+     */
+    public function appendRules(array $rules)
+    {
+        $this->rules = $this->mergeRules($rules);
+        return $this;
+    }
+
+    /**
      * @param array $data
      * @param array|iterable $rules
      * @param array|null $messages
@@ -55,7 +65,7 @@ class ValidationBuilder
     public function build(array $data = [],
                           array $rules = null,
                           array $messages = null,
-                          array $customAttributes = null): IlluminateValidator
+                          array $customAttributes = null): Validator
     {
         $rules = $this->mergeRules($rules);
         if ($this->useDataAsProperties) {
@@ -65,8 +75,7 @@ class ValidationBuilder
         }
         $messages = $this->mergeMessages($messages);
         $customAttributes = $this->mergeCustomAttributes($customAttributes);
-        $validator = $this->getFactory()->make($data, $preparedRules, $messages, $customAttributes);
-        return $validator;
+        return $this->getFactory()->make($data, $preparedRules, $messages, $customAttributes);
     }
 
     /**
@@ -227,7 +236,7 @@ class ValidationBuilder
      * @param array|null $messages
      * @param array|null $customAttributes
      * @return \Illuminate\Contracts\Validation\Validator
-     * @throws \Alys\Exception\NamedValidationException
+     * @throws \Sayla\Objects\Exception\EntityValidationException
      */
     public function validate(array $data,
                              array $rules = null,
@@ -236,7 +245,7 @@ class ValidationBuilder
     {
         $validator = $this->build($data, $rules, $messages, $customAttributes);
         if ($validator->fails()) {
-            throw new NamedValidationException($validator, $this->entityName);
+            throw new EntityValidationException($validator, $this->entityName);
         }
         return $validator;
     }
