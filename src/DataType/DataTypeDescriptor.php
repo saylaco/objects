@@ -9,50 +9,43 @@ use Sayla\Objects\SimpleEventDispatcher;
 use Sayla\Util\Mixin\MixinSet;
 use Serializable;
 
+/**
+ * Class DataTypeDescriptor
+ * @mixin \Sayla\Objects\Attribute\PropertyType\AccessDescriptorMixin
+ * @mixin \Sayla\Objects\Attribute\PropertyType\MapDescriptorMixin
+ * @mixin \Sayla\Objects\Attribute\PropertyType\ResolverDescriptorMixin
+ * @mixin \Sayla\Objects\Attribute\PropertyType\TransformationDescriptorMixin
+ */
 class DataTypeDescriptor implements Serializable
 {
     /** @var \Sayla\Util\Mixin\MixinSet */
     protected $mixins;
     /** @var string|ObjectCollection $objectCollectionClass */
     protected $objectCollectionClass = ObjectCollection::class;
-    /** @var \Illuminate\Support\Collection */
-    protected $resolvable = [];
     /** @var string[] */
     private $attributeNames = [];
     /** @var string */
     private $class;
     /** @var \Illuminate\Contracts\Events\Dispatcher */
     private $eventDispatcher;
-    /** @var \Illuminate\Support\Collection|\Sayla\Objects\Contract\Property[] */
-    private $getFilters = [];
     /** @var string */
     private $name;
-    /** @var \Illuminate\Support\Collection|\Sayla\Objects\Contract\Property[] */
-    private $setFilters = [];
 
     /**
      * DataTypeDescriptor constructor.
      * @param \Sayla\Objects\ObjectDispatcher $eventDispatcher
      * @param string $name
      * @param string $dataType
-     * @param array $resolvable
      * @param array $attributeNames
-     * @param \Illuminate\Support\Collection|\Sayla\Objects\Contract\Property[] $access
-     * @param \Illuminate\Support\Collection|\Sayla\Objects\Contract\Property[] $visible
-     * @param \Illuminate\Support\Collection|\Sayla\Objects\Contract\Property[] $defaults
-     * @param callable[] $setFilters
-     * @param callable[] $getFilters
+     * @param \Illuminate\Support\Collection|\Sayla\Objects\Contract\Attributes\Property[] $access
+     * @param \Illuminate\Support\Collection|\Sayla\Objects\Contract\Attributes\Property[] $visible
+     * @param \Illuminate\Support\Collection|\Sayla\Objects\Contract\Attributes\Property[] $defaults
      */
-    public function __construct(string $name, string $class, array $attributeNames,
-                                MixinSet $mixins = null,
-                                array $setFilters = [],
-                                array $getFilters = [])
+    public function __construct(string $name, string $class, array $attributeNames, MixinSet $mixins = null)
     {
         $this->class = $class;
         $this->name = $name;
         $this->attributeNames = array_combine($attributeNames, $attributeNames);
-        $this->setFilters = $setFilters;
-        $this->getFilters = $getFilters;
         $this->setMixins($mixins ?? new MixinSet());
     }
 
@@ -89,11 +82,6 @@ class DataTypeDescriptor implements Serializable
         $this->eventDispatcher = $eventDispatcher;
     }
 
-    public function getGetFilters($attributeName)
-    {
-        return $this->getFilters[$attributeName] ?? [];
-    }
-
     public function getMixin(string $name)
     {
         return $this->mixins[$name] ?? $this->mixins[class_basename($name)];
@@ -120,11 +108,6 @@ class DataTypeDescriptor implements Serializable
         return $this->class;
     }
 
-    public function getSetFilters($attributeName)
-    {
-        return $this->setFilters[$attributeName] ?? [];
-    }
-
     public function hasMixin(string $mixinClassOrName)
     {
         foreach ($this->mixins as $mixinName => $mixin)
@@ -148,8 +131,6 @@ class DataTypeDescriptor implements Serializable
             'attributeNames' => $this->attributeNames,
             'class' => $this->class,
             'dataType' => $this->name,
-            'getFilters' => $this->getFilters,
-            'setFilters' => $this->setFilters,
             'mixins' => $this->mixins
         ];
         return serialize($props);
@@ -169,8 +150,6 @@ class DataTypeDescriptor implements Serializable
         $this->attributeNames = $props['attributeNames'];
         $this->class = $props['class'];
         $this->name = $props['dataType'];
-        $this->getFilters = $props['getFilters'];
-        $this->setFilters = $props['setFilters'];
         $this->mixins = $props['mixins'];
     }
 }

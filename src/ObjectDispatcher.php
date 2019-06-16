@@ -34,10 +34,14 @@ class ObjectDispatcher implements Serializes
         return ['dispatcher'];
     }
 
+    public function dispatch($event, $payload = [])
+    {
+        return $this->dispatcher->dispatch($this->qualifyEventName($event), $payload);
+    }
+
     public function fire($event, $payload = [])
     {
-        $this->dispatcher->dispatch($this->qualifyEventName($event), $payload);
-        return $this;
+        return $this->dispatch($event, $payload);
     }
 
     /**
@@ -46,6 +50,11 @@ class ObjectDispatcher implements Serializes
     public function getName(): string
     {
         return $this->name;
+    }
+
+    public function hasListeners($event)
+    {
+        return $this->dispatcher->hasListeners($this->qualifyEventName($event));
     }
 
     public function on($event, $listener)

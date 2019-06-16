@@ -22,24 +22,36 @@ use Sayla\Support\Bindings\ResolvesSelf;
 
 class DataTypeManager implements IteratorAggregate, Arrayable
 {
+    use ResolvesSelf;
+    const ON_BEFORE_INIT = 'dataTypes.beforeInit';
+    const ON_INIT = 'dataTypes.init';
     private static $instance;
+    /** @var bool */
+    protected $alwaysScanClasses = false;
     /** @var callable */
     protected $builderResolver;
     /** @var Builder[] */
     protected $builders = [];
+    /** @var \Illuminate\Contracts\Events\Dispatcher */
+    protected $dispatcher;
+    /** @var bool */
+    protected $registersProviders = true;
     /** @var \Sayla\Objects\Stores\StoreManager */
     protected $storeManager;
     private $aliases = [];
     /** @var RegistrarRepository[] */
     private $builderRepos = [];
+    /** @var \Sayla\Objects\Builder\ClassScanner */
+    private $classScanner;
     /** @var DataType[] */
     private $dataTypes = [];
     /** @var callable[] */
     private $postAddDataType = [];
 
-    public function __construct(StoreManager $manager)
+    public function __construct(StoreManager $storeManager)
     {
-        $this->storeManager = $manager;
+        $this->storeManager = $storeManager;
+        $this->classScanner = new ClassScanner();
         if (!isset(self::$instance)) {
             self::$instance = $this;
         }
@@ -53,24 +65,31 @@ class DataTypeManager implements IteratorAggregate, Arrayable
 
     public static function getInstance(): self
     {
-        return self::$instance ?? (self::$instance = Container::getInstance()->make(self::class));
+        return self::resolve();
     }
 
-    public static function setInstance(self $instance): void
+    protected static function resolutionBinding(): string
     {
-        self::$instance = $instance;
+        return self::class;
     }
 
     public function addAttributeType(string $name, string $objectClass = null)
     {
         $this->dataTypes[$name] = null;
         $defaultOptions = ['dataType' => $name, 'class' => $objectClass];
-        ValueTransformerFactory::forceShareType(ObjectTransformer::class, $name, $defaultOptions);
+        TransformerFactory::forceShareType(ObjectTransformer::class, $name, $defaultOptions);
         return $this;
     }
 
     protected function addBuilder(Builder $builder)
     {
+        if (!empty($builder->getAlias()) && !isset($this->aliases[$builder->getAlias()])) {
+            $this->aliases[$builder->getAlias()] = $builder->getName();
+        }
+
+        if (!isset($this->aliases[$builder->getObjectClass()])) {
+            $this->aliases[$builder->getObjectClass()] = $builder->getName();
+        }
         return $this->builders[] = $builder;
     }
 
@@ -81,22 +100,22 @@ class DataTypeManager implements IteratorAggregate, Arrayable
 
     public function addClass(string $class, string $classFile = null)
     {
-        $name = $name ?? $class;
-        if (!isset($this->aliases[$class])) {
-            $this->aliases[$class] = $name;
+        $builder = $this->makeBuilder($class, compact('classFile'));
+        if (!$this->alwaysScanClasses) {
+            $builder->beforeBuild($this->classScanner);
         }
-        $builder = $this->makeBuilder($class, $name, $classFile);
-        $builder->beforeBuild(new ClassScanner());
         return $this->addBuilder($builder);
     }
 
     public function addConfigured(array $options)
     {
-        $builder = Builder::makeFromOptions($options);
-        if ($this->builderResolver) {
-            $builder->runCallback($this->builderResolver);
+        if (!isset($options['classFile'])) {
+            $options['classFile'] = class_exists($options['objectClass'])
+                ? self::classFilePath($options['objectClass'])
+                : null;
         }
-        return $this->addBuilder($builder);
+        $builder = $this->makeBuilder($options['objectClass'], $options);
+        return $this->addBuilder($builder->disableOptionsValidation());
     }
 
     /**
@@ -151,6 +170,23 @@ class DataTypeManager implements IteratorAggregate, Arrayable
         return new ArrayIterator($this->dataTypes);
     }
 
+    public function getObjectClass(string $name): string
+    {
+        return $this->get($name)->getDescriptor()->getObjectClass();
+    }
+
+    /**
+     * @param string $name
+     * @return \Sayla\Objects\Contract\Stores\Lookup
+     * @throws \Sayla\Exception\Error
+     */
+    public function getObjectLookup(string $name): Lookup
+    {
+        /** @var \Sayla\Objects\Contract\DataObject\Lookable $objectClass */
+        $objectClass = $this->get($name)->getDescriptor()->getObjectClass();
+        return $objectClass::lookup();
+    }
+
     /**
      * @return \Sayla\Objects\Stores\StoreManager
      */
@@ -183,47 +219,68 @@ class DataTypeManager implements IteratorAggregate, Arrayable
         return isset($this->dataTypes[$name]) || isset($this->aliases[$name]);
     }
 
-    public function init(bool $registerProviders = true)
+    public function init()
     {
-        if ($registerProviders) {
+        if ($this->dispatcher) {
+            $this->dispatcher->dispatch(self::ON_BEFORE_INIT, [$this]);
+        }
+
+        if ($this->registersProviders) {
             foreach ($this->builderRepos as $provider)
-                foreach ($provider->getBuilders() as $builderArray)
+                foreach ($provider->getBuilders() as $builderArray) {
                     $this->addConfigured($builderArray);
+                }
         }
 
         foreach ($this->builders as $builder) {
             $objectClass = $builder->getObjectClass();
 
-            if (!isset($this->aliases[$objectClass])) {
-                $this->aliases[$objectClass] = $builder->getName();
-            }
-
-            if (ValueTransformerFactory::isSharedType($builder->getName())) {
+            if (TransformerFactory::isSharedType($builder->getName())) {
                 continue;
             }
             $this->addAttributeType($builder->getName(), $objectClass);
         }
-
         foreach ($this->builders as $builder) {
             $this->addDataType($builder);
+        }
+        if ($this->dispatcher) {
+            $this->dispatcher->dispatch(self::ON_INIT);
         }
         return $this;
     }
 
-    public function makeBuilder(string $objectClass, string $name = null, string $classFile = null): Builder
+    public function makeBuilder(string $objectClass, array $options = null): Builder
     {
-        $builder = new Builder($objectClass, $name);
+        $builder = new Builder($objectClass, $options);
+
+        if (!isset($options['classFile']) && class_exists($objectClass, false)) {
+            $builder->classFile(self::classFilePath($objectClass));
+        }
+
         if ($this->builderResolver) {
             $builder->runCallback($this->builderResolver);
         }
-        $builder->classFile($classFile ?? (class_exists($objectClass,
-                false) ? self::classFilePath($objectClass) : null));
+
+        if ($this->alwaysScanClasses && isset($builder->classFile)) {
+            $builder->beforeBuild($this->classScanner);
+        }
+
+        if (!isset($this->aliases[$builder->getName()])) {
+            $this->aliases[$builder->getName()] = $objectClass;
+        }
+
         return $builder;
     }
 
     public function onAddDataType(callable $callback)
     {
         $this->postAddDataType[] = $callback;
+        return $this;
+    }
+
+    public function setAlwaysScanClasses(bool $value)
+    {
+        $this->alwaysScanClasses = $value;
         return $this;
     }
 
@@ -234,6 +291,22 @@ class DataTypeManager implements IteratorAggregate, Arrayable
     public function setBuilderResolver(callable $callback)
     {
         $this->builderResolver = $callback;
+        return $this;
+    }
+
+    /**
+     * @param \Illuminate\Contracts\Events\Dispatcher $dispatcher
+     * @return DataTypeManager
+     */
+    public function setDispatcher(Dispatcher $dispatcher): DataTypeManager
+    {
+        $this->dispatcher = $dispatcher;
+        return $this;
+    }
+
+    public function setRegistersProviders(bool $value)
+    {
+        $this->registersProviders = $value;
         return $this;
     }
 

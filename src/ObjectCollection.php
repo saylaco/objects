@@ -19,7 +19,7 @@ class ObjectCollection extends Collection implements Responsable, Collectionable
 {
     protected static $enforceItemType = true;
     protected $allowNullItems = false;
-    protected $dataType = DataObject::class;
+    protected $dataTypeName = DataObject::class;
     protected $keyAttribute;
     protected $requireItemKey = false;
 
@@ -33,7 +33,7 @@ class ObjectCollection extends Collection implements Responsable, Collectionable
                                                 bool $requireItemKey = false, string $itemKey = null)
     {
         $collection = new static();
-        $collection->dataType = $descriptor;
+        $collection->dataTypeName = $descriptor;
         $collection->allowNullItems = $allowNullItems;
         $collection->requireItemKey = $requireItemKey;
         $collection->keyAttribute = $itemKey;
@@ -61,19 +61,27 @@ class ObjectCollection extends Collection implements Responsable, Collectionable
     }
 
     /**
+     * @return array
+     */
+    public function getArrayCopy(): array
+    {
+        return $this->items;
+    }
+
+    /**
      * @return string
      */
-    public function getItemClass(): string
+    public function getDataTypeName(): string
     {
-        return $this->dataType;
+        return $this->dataTypeName;
     }
 
     /**
      * @return \Sayla\Objects\DataType\DataTypeDescriptor
      */
-    protected function getItemDescriptor(): DataTypeDescriptor
+    public function getItemDescriptor(): DataTypeDescriptor
     {
-        return DataTypeManager::getInstance()->getDescriptor($this->dataType);
+        return DataTypeManager::getInstance()->getDescriptor($this->dataTypeName);
     }
 
     public function groupBy($groupBy, $preserveKeys = false)
@@ -117,7 +125,7 @@ class ObjectCollection extends Collection implements Responsable, Collectionable
      */
     protected function makeObject($item)
     {
-        return DataTypeManager::getInstance()->get($this->dataType)->hydrate($item);
+        return DataTypeManager::getInstance()->get($this->dataTypeName)->hydrate($item);
     }
 
     /**
@@ -127,8 +135,10 @@ class ObjectCollection extends Collection implements Responsable, Collectionable
     public function makeObjects($items)
     {
         foreach ($items as $i => $item) {
-            if (!$item instanceof $this->dataType) {
-                $this->push($this->makeObject($item));
+            if (!$item instanceof $this->dataTypeName) {
+                if (filled($item)) {
+                    $this->push($this->makeObject($item));
+                }
             } else {
                 $this->push($item);
             }
@@ -184,22 +194,7 @@ class ObjectCollection extends Collection implements Responsable, Collectionable
     public function resolve(...$attributes)
     {
         $itemDescriptor = $this->getItemDescriptor();
-        $allAttributes = [];
-        foreach ($attributes as $attribute) {
-            $resolver = $itemDescriptor->getResolver($attribute);
-            if ($resolver instanceof NonCachableAttribute) {
-                continue;
-            }
-            $values = $resolver->resolveMany($this);
-            foreach ($values as $i => $value) {
-                $allAttributes[$i][$attribute] = $value;
-            }
-        }
-        if (!empty($allAttributes)) {
-            foreach ($this as $i => $object) {
-                $object->init($allAttributes[$i]);
-            }
-        }
+        $itemDescriptor->resolve($this, $attributes);
         return $this;
     }
 
@@ -211,6 +206,23 @@ class ObjectCollection extends Collection implements Responsable, Collectionable
     public function toPrettyJson()
     {
         return json_encode($this->jsonSerialize(), JSON_PRETTY_PRINT);
+    }
+
+    /**
+     * Create an HTTP response that represents the object.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\Response
+     */
+    public function toResponse($request)
+    {
+        if ($this->first() instanceof ResponsableObject) {
+            return new JsonResponse($this->map->getResponseObject($request));
+        }
+        if ($this->first() instanceof DataObject) {
+            return new JsonResponse($this->map->toVisibleObject());
+        }
+        return new JsonResponse($this->items);
     }
 
     protected function validateItemKey($key)
@@ -237,7 +249,7 @@ class ObjectCollection extends Collection implements Responsable, Collectionable
             && ($value->dataTypeName() != $itemDescriptor->getDataType())
             && (get_class($value) != $itemDescriptor->getObjectClass())
         ) {
-            throw new InvalidValue("An item must a '{$this->dataType}' object");
+            throw new InvalidValue("An item must a '{$this->dataTypeName}' object");
         }
     }
 }

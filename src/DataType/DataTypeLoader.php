@@ -138,11 +138,11 @@ class DataTypeLoader
             case self::CONFIG_ARRAY:
                 return $manager->addConfigured(array_merge($object['config'], [
                     'objectClass' => $object['class'],
-                    'name' => $object['config']['name'] ?? $object['class'],
-                ]));
+                    'name' => $object['config']['name'] ?? $object['class']
+                ]))->enableOptionsValidation();
             case self::CONFIG_ANNOTATIONS:
             default:
-                return $manager->addClass($object['class']);
+                return $manager->addClass($object['class'], $object['file']);
         }
     }
 

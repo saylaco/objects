@@ -5,8 +5,7 @@ namespace Sayla\Objects\DataType;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Support\Arrayable;
 use Sayla\Objects\Attribute\AttributeFactory;
-use Sayla\Objects\Attribute\PropertyType\MapDescriptorMixin;
-use Sayla\Objects\Contract\ObjectStore;
+use Sayla\Objects\Contract\Stores\ObjectStore;
 use Sayla\Objects\DataObject;
 use Sayla\Objects\Exception\HydrationError;
 use Sayla\Objects\SimpleEventDispatcher;
@@ -88,6 +87,7 @@ final class DataType
         if ($eventDispatcher) {
             $descriptor->setEventDispatcher(Container::getInstance()->make($eventDispatcher));
         }
+        $attributeFactory->registerObjectListeners($descriptor->dispatcher());
         return $descriptor;
     }
 
@@ -104,7 +104,7 @@ final class DataType
         $extractedData = $finalContext->attributes;
         return $extractedData;
     }
-    
+
     /**
      * @return AttributeFactory
      */
@@ -122,7 +122,7 @@ final class DataType
     }
 
     /**
-     * @return \Sayla\Objects\DataType\DataTypeDescriptor|\Sayla\Objects\Attribute\DefaultPropertyMixinSet
+     * @return \Sayla\Objects\DataType\DataTypeDescriptor
      */
     public function getDescriptor(): DataTypeDescriptor
     {
@@ -151,7 +151,7 @@ final class DataType
     }
 
     /**
-     * @return \Sayla\Objects\Contract\ObjectStore
+     * @return \Sayla\Objects\Contract\Stores\ObjectStore
      */
     public function getStoreStrategy(): ?ObjectStore
     {
@@ -250,9 +250,17 @@ final class DataType
 
     private function getHydrationPipeline(array $attributes = [])
     {
-        $pipeline = $this->hydrationPipeline ?? ($this->hydrationPipeline = $this->attributes
-                ->getHydrationPipeline());
+        $pipeline = $this->hydrationPipeline
+            ?? ($this->hydrationPipeline = $this->attributes->getHydrationPipeline());
         return $pipeline->send(new AttributesContext($this->descriptor, $attributes));
+    }
+
+    /**
+     * @return string|null
+     */
+    public function getStoreDriver(): ?string
+    {
+        return $this->storeOptions ? $this->storeOptions['driver'] : null;
     }
 
 

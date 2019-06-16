@@ -17,10 +17,10 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
     use SupportsDataTypeManagerTrait;
     use TriggerableTrait;
 
-    protected const DATA_TYPE = null;
     const TRIGGER_PREFIX = '__';
     protected static $unguarded = false;
-
+    protected $buildableAttributes = [];
+    protected $exists = null;
     private $initializing = false;
     private $modifiedAttributes = [];
     private $resolving = false;
@@ -43,7 +43,8 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
 
     public static function dataTypeName(): string
     {
-        return static::DATA_TYPE ?? static::class;
+        $typeName = static::class . '::DATA_TYPE';
+        return defined($typeName) ? constant($typeName) : static::class;
     }
 
     final static public function descriptor(): DataTypeDescriptor
@@ -121,17 +122,26 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
         $this->modifiedAttributes = [];
     }
 
+    protected function determineExistence()
+    {
+        return false;
+    }
+
+    /**
+     * @return array
+     * @throws \Sayla\Objects\Exception\TransformationError
+     */
+    public function extract(): array
+    {
+        return static::dataType()->extract($this);
+    }
+
     protected function getAttributeValue(string $attributeName)
     {
-        if (!$this->isAttributeSet($attributeName) && $this->descriptor()->hasResolver($attributeName)) {
-            $this->resolveAttributeValue($attributeName);
+        if (!$this->isAttributeFilled($attributeName) && $this->descriptor()->hasResolver($attributeName)) {
+            return $this->getAttributeValueViaGetter($attributeName, $this->resolveAttributeValue($attributeName));
         }
-        $value = $this->getRawAttribute($attributeName);
-        $value = $this->runGetFilters($attributeName, $value);
-        if ($this->hasAttributeGetter($attributeName)) {
-            return $this->{$this->getAttributeGetter($attributeName)}($value);
-        }
-        return $value;
+        return $this->getAttributeValueViaGetter($attributeName);
     }
 
     protected function getGuardedAttributeValue(string $attributeName)
@@ -166,6 +176,9 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
     {
         $this->initializing = true;
         $this->initialize($attributes);
+        if ($this instanceof Storable) {
+            $this->exists = $this->determineExistence();
+        }
         $this->initializing = false;
         return $this;
     }
@@ -176,7 +189,7 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
     protected function initialize($attributes): void
     {
         foreach ($attributes as $key => $value) {
-            $this->setRawAttribute($key, $this->runSetFilters($key, $value));
+            $this->setRawAttribute($key, $value);
         }
     }
 
@@ -212,6 +225,14 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
         return $this->initializing;
     }
 
+    /**
+     * @return bool
+     */
+    public function isModified(string $attribute): bool
+    {
+        return isset($this->modifiedAttributes[$attribute]);
+    }
+
     public function isResolving(): bool
     {
         return $this->resolving;
@@ -220,6 +241,14 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
     protected function isRetrievableAttribute(string $attributeName)
     {
         return parent::isRetrievableAttribute($attributeName) || $this->isAttributeReadable($attributeName);
+    }
+
+    /**
+     * @return bool
+     */
+    public function isTouched(): bool
+    {
+        return count($this->getModifiedAttributes()) > 0;
     }
 
     /**
@@ -264,20 +293,23 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
 
     public function resolve(...$attributes)
     {
-        $descriptor = $this->descriptor();
+        $resolving = $this->resolving;
+        /** @var \Sayla\Objects\Attribute\PropertyType\ResolverDescriptorMixin $descriptor */
+        $descriptor = static::descriptor();
         $this->resolving = true;
-        $model = $this;
-        $values = collect($attributes)->flatMap(function ($attributeName) use ($descriptor, $model) {
-            if ($descriptor->hasResolver($attributeName)) {
+
+        // get values with resolvers
+        $values = collect($attributes)
+            ->filter(function ($attributeName) use ($descriptor) {
+                return $descriptor->hasResolver($attributeName);
+            })
+            ->flatMap(function ($attributeName) use ($descriptor) {
                 $resolver = $descriptor->getResolver($attributeName);
-                if (!($resolver instanceof NonCachableAttribute)) {
-                    return [$attributeName => $resolver->resolve($model)];
-                }
-            }
-            return [];
-        });
+                return [$attributeName => $resolver->resolve($this)];
+            });
+
         $this->init($values->all());
-        $this->resolving = false;
+        $this->resolving = $resolving;
         return $this;
     }
 
@@ -288,6 +320,7 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
      */
     protected function resolveAttributeValue(string $attributeName)
     {
+        $resolving = $this->resolving;
         $this->resolving = true;
         if (!$this->descriptor()->hasResolver($attributeName)) {
             $value = null;
@@ -295,12 +328,25 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
         } else {
             $resolver = $this->descriptor()->getResolver($attributeName);
             $value = $resolver->resolve($this);
-            if (!($resolver instanceof NonCachableAttribute)) {
-                $this->init([$attributeName => $value]);
-            }
+            $this->initialize([$attributeName => $value]);
         }
-        $this->resolving = false;
+        $this->resolving = $resolving;
         return $value;
+    }
+
+    /**
+     * @param string[] ...$attributes
+     * @return \Illuminate\Support\Collection|mixed[]
+     */
+    public function resolveGetters(...$attributes)
+    {
+        return collect($attributes)
+            ->filter(function ($attributeName) {
+                return $this->hasAttributeGetter($attributeName);
+            })
+            ->flatMap(function ($attributeName) {
+                return [$attributeName => $this->getAttributeValueViaGetter($attributeName)];
+            });
     }
 
     public function serialize()
@@ -314,7 +360,10 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
         if ($this->isTrackingModifiedAttributes()) {
             $this->modifiedAttributes[$attributeName] = $attributeName;
         }
-        parent::setAttributeValue($attributeName, $this->runSetFilters($attributeName, $value));
+        if (in_array($attributeName, $this->buildableAttributes)) {
+            $value = static::descriptor()->getTransformer()->build($attributeName, $value);
+        }
+        parent::setAttributeValue($attributeName, $value);
     }
 
     /**
@@ -337,15 +386,7 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
      */
     public function toScalarArray()
     {
-        return simple_value($this->toArray());
-    }
-
-    /**
-     * @return array
-     */
-    public function toVisibleArray(): array
-    {
-        return array_only($this->toArray(), $this->descriptor()->getVisible());
+        return scalarize($this->toArray());
     }
 
     /**
@@ -353,17 +394,13 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
      */
     public function toVisibleObject()
     {
-        return AttributableObject::make($this->toVisibleArray());
-    }
-
-    /**
-     * Get visible items as an array of scalar values
-     *
-     * @return array
-     */
-    public function toVisibleScalarArray()
-    {
-        return simple_value($this->toVisibleArray());
+        $map = $this->getVisibleValueMap();
+        foreach ($map['resolvable'] as $k => $v) {
+            if ($v instanceof DataObject) {
+                $map['values'][$k] = $v->toVisibleObject();
+            }
+        }
+        return new AttributableObject($map['values']);
     }
 
     public function unserialize($serialized)
@@ -382,33 +419,25 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
 
     /**
      * @param string $attributeName
-     * @param        $value
      * @return mixed
      */
-    private function runGetFilters(string $attributeName, $value)
+    private function getAttributeValueViaGetter(string $attributeName, $value = null)
     {
-        foreach ($this->descriptor()->getGetFilters($attributeName) as $callable) {
-            if (is_string($callable) && starts_with($callable, '@')) {
-                $callable = [$this, substr($callable, 1)];
-            }
-            $value = call_user_func($callable, $value);
+        $value = func_num_args() > 1 ? $value : $this->getRawAttribute($attributeName);
+        if ($this->hasAttributeGetter($attributeName)) {
+            return $this->{$this->getAttributeGetter($attributeName)}($value);
         }
         return $value;
     }
 
     /**
-     * @param string $attributeName
-     * @param        $value
-     * @return mixed
+     * @return array
      */
-    private function runSetFilters(string $attributeName, $value)
+    private function getVisibleValueMap(): array
     {
-        foreach ($this->descriptor()->getSetFilters($attributeName) as $callable) {
-            if (is_string($callable) && starts_with($callable, '@')) {
-                $callable = [$this, substr($callable, 1)];
-            }
-            $value = call_user_func($callable, $value);
-        }
-        return $value;
+        $values = array_except($this->toArray(), $this->descriptor()->getHidden());
+        $resolvable = $this->descriptor()->getResolvable();
+        $resolvable = array_only($values, $resolvable);
+        return compact('values', 'resolvable');
     }
 }
