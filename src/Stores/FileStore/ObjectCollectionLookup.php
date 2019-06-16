@@ -2,9 +2,11 @@
 
 namespace Sayla\Objects\Stores\FileStore;
 
+use Sayla\Objects\Contract\Lookup;
+use Sayla\Objects\DataType\DataTypeManager;
 use Sayla\Objects\ObjectCollection;
 
-class ObjectCollectionLookup
+class ObjectCollectionLookup implements Lookup
 {
     /** @var string */
     protected $dataType;
@@ -51,6 +53,9 @@ class ObjectCollectionLookup
      */
     public function find($key)
     {
+        if (isset($this->records[$key])) {
+            return DataTypeManager::getInstance()->get($this->dataType)->hydrate($this->records[$key]);
+        }
         return $this->all()->firstWhere($this->keyAttribute, '=', $key);
     }
 
@@ -59,9 +64,19 @@ class ObjectCollectionLookup
      * @param $key
      * @return \Sayla\Objects\StorableTrait
      */
-    public function findBy($attribute, $key)
+    public function findBy($attribute, $value)
     {
-        return $this->all()->firstWhere($attribute, '=', $key);
+        return $this->all()->firstWhere($attribute, '=', $value);
+    }
+
+    /**
+     * @param $attribute
+     * @param $key
+     * @return \Sayla\Objects\ObjectCollection
+     */
+    public function getWhere($attribute, $value)
+    {
+        return $this->all()->where($attribute, '=', $value);
     }
 
     /**

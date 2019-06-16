@@ -2,37 +2,33 @@
 
 namespace Sayla\Objects\Stores\FileStore;
 
+use Sayla\Objects\Contract\LookableTrait;
 use Sayla\Objects\Stores\FileStore;
 
 /**
  * Trait LooksUpFileRepoTrait
  * @mixin \Sayla\Objects\StorableTrait
- * @method static FileStore\FileRepoStore getStore()
+ * @method static FileStore\FileDataStore getStore()
  */
 trait LooksUpFileRepoTrait
 {
-    /**
-     * @return static[]|\Sayla\Objects\ObjectCollection
-     */
-    public static function all()
-    {
-        return static::getStore()->lookup()->all();
-    }
+    use LookableTrait;
 
     /**
-     * @return static
+     * @return \Sayla\Objects\Stores\FileStore\ObjectCollectionLookup
      */
-    public static function find($key)
+    public static function lookup()
     {
-        return static::getStore()->lookup()->find($key);
+        return static::getStore()->lookup();
     }
 
-    /**
-     * @return static
-     */
-    public static function findBy($attribute, $key)
+    protected function determineExistence(): bool
     {
-        return static::getStore()->lookup()->findBy($attribute, $key);
+        return filled($this->getKey()) && static::getStore()->exists($this->getKey());
     }
 
+    public function getKey()
+    {
+        return $this[static::getStore()->getPrimaryKey()];
+    }
 }

@@ -7,13 +7,19 @@ use Illuminate\Contracts\Container\Container;
 use InvalidArgumentException;
 use Sayla\Objects\Contract\ConfigurableStore;
 use Sayla\Objects\Contract\ObjectStore;
-use Sayla\Objects\Stores\FileStore\FileRepoStore;
+use Sayla\Objects\Stores\FileStore\FileDataStore;
+use Sayla\Objects\Stores\FileStore\ReadFileDataStore;
 use Sayla\Objects\Support\Illuminate\EloquentStore;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class StoreManager
 {
     private static $instance;
+    public const DEFAULT_DRIVERS = [
+        'Eloquent' => EloquentStore::class,
+        'File' => FileDataStore::class,
+        'ReadFile' => ReadFileDataStore::class,
+    ];
     /**
      * @var \Illuminate\Contracts\Container\Container
      */
@@ -63,26 +69,12 @@ class StoreManager
 
     protected function callCustomCreator(string $name, array $config): ObjectStore
     {
-        return $this->customCreators[$config['driver']]($this->container, $config, $name);
+        return $this->customCreators[$config['driver']]['callback']($this->container, $config, $name);
     }
 
     protected function createDriver(string $driver): ObjectStore
     {
-        $driverMethod = 'create' . ucfirst($driver) . 'Driver';
-        if (method_exists($this, $driverMethod)) {
-            return $this->{$driverMethod}();
-        }
-        throw new InvalidArgumentException("Driver [{$driver}] is not supported.");
-    }
-
-    protected function createEloquentDriver(): EloquentStore
-    {
-        return $this->container->make(EloquentStore::class);
-    }
-
-    protected function createFileDriver(): FileRepoStore
-    {
-        return $this->container->make(FileRepoStore::class);
+        return $this->container->make($this->getDriverClass($driver));
     }
 
     /**
@@ -92,10 +84,12 @@ class StoreManager
      * @param \Closure $callback
      * @return $this
      */
-    public function extend($driver, Closure $callback)
+    public function extend($driver, string $storeClass, Closure $callback)
     {
-        $this->customCreators[$driver] = $callback->bindTo($this, $this);
-
+        $this->customCreators[$driver] = [
+            'storeClass' => $storeClass,
+            'callback' => $callback->bindTo($this, $this)
+        ];
         return $this;
     }
 
@@ -121,6 +115,18 @@ class StoreManager
         return $this->stores[$name] = $this->store($name);
     }
 
+    public function getDriverClass($driver)
+    {
+        $driver = ucfirst($driver);
+        if (isset($this->customCreators[$driver])) {
+            return $this->customCreators[$driver]['storeClass'];
+        }
+        if (isset(self::DEFAULT_DRIVERS[$driver])) {
+            return self::DEFAULT_DRIVERS[$driver];
+        }
+        throw new InvalidArgumentException("Driver [{$driver}] is not supported.");
+    }
+
     public function getOptions($name): array
     {
         return $this->storeOptions[$name]['options'];
@@ -134,7 +140,7 @@ class StoreManager
         return $this->store($name);
     }
 
-    protected function resolve(string $name): ObjectStore
+    protected function makeStore(string $name): ObjectStore
     {
         if (!isset($this->storeOptions[$name]) && $this->optionsLoader) {
             $this->storeOptions[$name] = call_user_func($this->optionsLoader, $name);
@@ -166,18 +172,18 @@ class StoreManager
         return $store;
     }
 
-    /**
-     * @param callable $optionsLoader
-     * @return $this
-     */
-    public function setOptionsLoader(callable $optionsLoader)
-    {
-        $this->optionsLoader = $optionsLoader;
-        return $this;
-    }
+//    /**
+//     * @param callable $optionsLoader
+//     * @return $this
+//     */
+//    public function setOptionsLoader(callable $optionsLoader)
+//    {
+//        $this->optionsLoader = $optionsLoader;
+//        return $this;
+//    }
 
     public function store($name): ObjectStore
     {
-        return $this->stores[$name] ?? $this->resolve($name);
+        return $this->stores[$name] ?? $this->makeStore($name);
     }
 }
