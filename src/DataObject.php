@@ -2,6 +2,7 @@
 
 namespace Sayla\Objects;
 
+use Illuminate\Support\Str;
 use Sayla\Objects\Contract\DataObject\SupportsDataTypeManager;
 use Sayla\Objects\Contract\DataObject\SupportsDataTypeManagerTrait;
 use Sayla\Objects\Contract\Exception\InaccessibleAttribute;
@@ -27,6 +28,7 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
     private $setObjectProperties = false;
 
     /**
+     * @noinspection PhpMissingParentConstructorInspection
      * @param array $attributes
      */
     public function __construct($attributes = null)
@@ -52,9 +54,19 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
         return self::getDataTypeManager()->getDescriptor(static::dataTypeName());
     }
 
+    static public function makeCollectionResponse($request, $collection)
+    {
+        return static::dataType()->getResponseFactory()->makeCollectionResponse($request, $collection);
+    }
+
+    static public function makeObjectResponse($request, $object)
+    {
+        return static::dataType()->getResponseFactory()->makeObjectResponse($request, $object);
+    }
+
     public static function newObjectCollection()
     {
-        return static::descriptor()->newCollection();
+        return static::dataType()->newCollection();
     }
 
     /**
@@ -93,7 +105,7 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
 
     public function __get($name)
     {
-        if (starts_with($name, self::TRIGGER_PREFIX)) {
+        if (Str::startsWith($name, self::TRIGGER_PREFIX)) {
             return $this->getTriggerCount(substr($name, 2));
         }
         return $this->getGuardedAttributeValue($name);
@@ -104,7 +116,7 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
         if ($this->setObjectProperties) {
             parent::__set($name, $value);
         } else {
-            if (starts_with($name, self::TRIGGER_PREFIX)) {
+            if (Str::startsWith($name, self::TRIGGER_PREFIX)) {
                 $this->addTrigger(substr($name, 2), $value);
             } else {
                 $this->setGuardedAttributeValue($name, $value);
@@ -273,9 +285,6 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
                 $this->{$offset} = $value;
             }
         } else {
-            if ($offset == 'attributes') {
-                debug_print_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
-            }
             $this->setGuardedAttributeValue($offset, $value);
         }
     }
@@ -297,7 +306,6 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
         /** @var \Sayla\Objects\Attribute\PropertyType\ResolverDescriptorMixin $descriptor */
         $descriptor = static::descriptor();
         $this->resolving = true;
-
         // get values with resolvers
         $values = collect($attributes)
             ->filter(function ($attributeName) use ($descriptor) {
@@ -380,6 +388,15 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
     }
 
     /**
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function toResponse($request)
+    {
+        return self::makeObjectResponse($request, $this);
+    }
+
+    /**
      * Get items as an array of scalar values
      *
      * @return array
@@ -387,20 +404,6 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
     public function toScalarArray()
     {
         return scalarize($this->toArray());
-    }
-
-    /**
-     * @return \Sayla\Objects\AttributableObject
-     */
-    public function toVisibleObject()
-    {
-        $map = $this->getVisibleValueMap();
-        foreach ($map['resolvable'] as $k => $v) {
-            if ($v instanceof DataObject) {
-                $map['values'][$k] = $v->toVisibleObject();
-            }
-        }
-        return new AttributableObject($map['values']);
     }
 
     public function unserialize($serialized)
@@ -428,16 +431,5 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
             return $this->{$this->getAttributeGetter($attributeName)}($value);
         }
         return $value;
-    }
-
-    /**
-     * @return array
-     */
-    private function getVisibleValueMap(): array
-    {
-        $values = array_except($this->toArray(), $this::descriptor()->getHidden());
-        $resolvable = $this::descriptor()->getResolvable();
-        $resolvable = array_only($values, $resolvable);
-        return compact('values', 'resolvable');
     }
 }

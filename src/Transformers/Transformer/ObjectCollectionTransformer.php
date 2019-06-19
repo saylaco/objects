@@ -1,14 +1,17 @@
 <?php namespace Sayla\Objects\Transformers\Transformer;
 
 use ReflectionClass;
+use Sayla\Objects\Contract\DataObject\SupportsDataTypeManager;
+use Sayla\Objects\Contract\DataObject\SupportsDataTypeManagerTrait;
 use Sayla\Objects\DataObject;
 use Sayla\Objects\ObjectCollection;
 use Sayla\Objects\Transformers\AttributeValueTransformer;
 use Sayla\Objects\Transformers\ValueTransformerTrait;
 use Sayla\Util\JsonHelper;
 
-class ObjectCollectionTransformer implements AttributeValueTransformer
+class ObjectCollectionTransformer implements AttributeValueTransformer, SupportsDataTypeManager
 {
+    use SupportsDataTypeManagerTrait;
     use ValueTransformerTrait;
 
     /**
@@ -60,13 +63,10 @@ class ObjectCollectionTransformer implements AttributeValueTransformer
             if (is_subclass_of($dataType, DataObject::class)) {
                 return $dataType::newObjectCollection();
             }
-            return ObjectCollection::makeObjectCollection(
-                $dataType,
-                $this->options->get('nullableItems', false),
-                $this->options->get('requireKeys', false)
-            );
+            return $this->options->get('restricted', true)
+                ? self::getDataTypeManager()->get($dataType)->newCollection()->toUnrestrictedCollection()
+                : self::getDataTypeManager()->get($dataType)->newCollection();
         }
-        return ObjectCollection::make();
     }
 
     /**

@@ -82,7 +82,7 @@ trait TriggerableTrait
         if (method_exists($instance, $triggerMethod)) {
             $results['instance'][] = $instance::$triggerMethod($instance);
         }
-        $results['dispatcher'] = static::descriptor()->dispatcher()->fire($triggerName, [$this]);
+        $results['dispatcher'] = static::dataType()->dispatcher()->fire($triggerName, [$this]);
         return $results;
     }
 
@@ -103,7 +103,7 @@ trait TriggerableTrait
         $triggerMethod = self::TRIGGER_PREFIX . $triggerName;
         return isset($this->triggers[$triggerName])
             || method_exists(static::class, $triggerMethod)
-            || static::descriptor()->dispatcher()->hasListeners($triggerName);
+            || static::dataType()->dispatcher()->hasListeners($triggerName);
     }
 
 }

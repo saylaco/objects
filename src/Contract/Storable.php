@@ -4,7 +4,7 @@ namespace Sayla\Objects\Contract;
 
 use Sayla\Objects\Contract\Stores\ObjectStore;
 
-interface Storable extends Keyable
+interface Storable
 {
     const ON_AFTER_CREATE = 'afterCreate';
     const ON_AFTER_DELETE = 'afterDelete';

@@ -41,6 +41,4 @@ interface IDataObject extends Attributable, Serializable
     public function resolve(...$attributes);
 
     public function toScalarArray();
-
-    public function toVisibleObject();
 }

@@ -2,6 +2,8 @@
 
 namespace Sayla\Objects\Builder;
 
+use Illuminate\Contracts\Events\Dispatcher;
+use Sayla\Objects\Contract\DataObject\ResponsableObject;
 use Sayla\Objects\DataType\DataType;
 use Sayla\Objects\ObjectDispatcher;
 use Sayla\Objects\Transformers\TransformerFactory;
@@ -255,10 +257,22 @@ class DataTypeConfig
     {
         if (!isset($this->optionsResolver)) {
             $resolver = new OptionsResolver();
-            $resolver->setRequired(['objectClass', 'attributes']);
+            $resolver->setRequired(['objectClass', 'attributes', 'resolveOnRequest']);
 
             $resolver->setAllowedTypes('objectClass', 'string');
             $resolver->setAllowedTypes('attributes', 'array');
+            $resolver->setAllowedTypes('resolveOnRequest', 'array');
+            $resolver->setDefault('resolveOnRequest', function (Options $options) {
+                /** @var ResponsableObject $objectClass */
+                $objectClass = $options['objectClass'];
+                if (is_subclass_of($objectClass, ResponsableObject::class)) {
+                    return $objectClass::getResponseResolvableAttributes();
+                }
+                return [];
+            });
+
+            $resolver->setDefined('dispatcher');
+            $resolver->setAllowedTypes('dispatcher', Dispatcher::class);
 
             $resolver->setDefined('store');
             $resolver->setAllowedTypes('store', 'array');

@@ -61,7 +61,7 @@ class ResolverDescriptorMixin implements Mixin
      * @return \Sayla\Objects\ObjectCollection
      * @throws \Sayla\Objects\Contract\Exception\AttributeResolverNotFound
      */
-    public function resolve(ObjectCollection $collection, array $attributeNames)
+    public function resolveMany(ObjectCollection $collection, array $attributeNames)
     {
         $allAttributes = [];
         // get values with resolvers

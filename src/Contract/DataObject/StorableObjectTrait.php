@@ -29,32 +29,32 @@ trait StorableObjectTrait
 
     public static function onAfterCreate($listener)
     {
-        static::descriptor()->dispatcher()->on(Storable::ON_AFTER_CREATE, $listener);
+        static::dataType()->dispatcher()->on(Storable::ON_AFTER_CREATE, $listener);
     }
 
     public static function onAfterDelete($listener)
     {
-        static::descriptor()->dispatcher()->on(Storable::ON_AFTER_DELETE, $listener);
+        static::dataType()->dispatcher()->on(Storable::ON_AFTER_DELETE, $listener);
     }
 
     public static function onAfterUpdate($listener)
     {
-        static::descriptor()->dispatcher()->on(Storable::ON_AFTER_UPDATE, $listener);
+        static::dataType()->dispatcher()->on(Storable::ON_AFTER_UPDATE, $listener);
     }
 
     public static function onBeforeCreate($listener)
     {
-        static::descriptor()->dispatcher()->on(Storable::ON_BEFORE_CREATE, $listener);
+        static::dataType()->dispatcher()->on(Storable::ON_BEFORE_CREATE, $listener);
     }
 
     public static function onBeforeDelete($listener)
     {
-        static::descriptor()->dispatcher()->on(Storable::ON_BEFORE_DELETE, $listener);
+        static::dataType()->dispatcher()->on(Storable::ON_BEFORE_DELETE, $listener);
     }
 
     public static function onBeforeUpdate($listener)
     {
-        static::descriptor()->dispatcher()->on(Storable::ON_BEFORE_UPDATE, $listener);
+        static::dataType()->dispatcher()->on(Storable::ON_BEFORE_UPDATE, $listener);
     }
 
     /**
