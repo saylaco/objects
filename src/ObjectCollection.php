@@ -2,42 +2,76 @@
 
 namespace Sayla\Objects;
 
+use Exception;
 use Illuminate\Contracts\Support\Responsable;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
 use Sayla\Data\JavascriptObject;
 use Sayla\Exception\InvalidValue;
 use Sayla\Helper\Data\Contract\Collectionable;
-use Sayla\Objects\Contract\DataObject\ResponsableObject;
+use Sayla\Objects\Contract\DataObject\SupportsDataTypeManager;
+use Sayla\Objects\Contract\DataObject\SupportsDataTypeManagerTrait;
+use Sayla\Objects\Contract\IDataObject;
+use Sayla\Objects\DataType\DataType;
 use Sayla\Objects\DataType\DataTypeDescriptor;
-use Sayla\Objects\DataType\DataTypeManager;
+use Sayla\Objects\Support\ObjectCollectionProxy;
 
 /**
- * @method DataObject[] getIterator
+ * @method IDataObject[] getIterator
  */
-class ObjectCollection extends Collection implements Responsable, Collectionable
+abstract class ObjectCollection extends Collection implements Responsable, Collectionable, SupportsDataTypeManager
 {
+    use SupportsDataTypeManagerTrait;
     protected static $enforceItemType = true;
+    private static $collectionClasses = [];
     protected $allowNullItems = false;
-    protected $dataTypeName = DataObject::class;
     protected $keyAttribute;
     protected $requireItemKey = false;
 
+    /** @noinspection PhpMissingParentConstructorInspection */
+    public function __construct($items = [])
+    {
+        if (!empty($items)) {
+            if ($items instanceof Collection) {
+                $this->items = $items->items;
+            } else {
+                $this->fill($items);
+            }
+        }
+    }
+
     /**
-     * @param string $descriptor
-     * @param bool $allowNullItems
-     * @param bool $requireItemKey
+     * @param string $dataTypeName
+     * @return \Sayla\Objects\ObjectCollection
+     */
+    public static function makeFor(string $dataTypeName)
+    {
+        if (!isset(self::$collectionClasses[$dataTypeName])) {
+            $collection = new class() extends ObjectCollection
+            {
+                public $dataTypeName;
+
+                /**
+                 * @return string
+                 */
+                public function getDataTypeName(): string
+                {
+                    return $this->dataTypeName;
+                }
+            };
+            $collection->dataTypeName = $dataTypeName;
+            self::$collectionClasses[$dataTypeName] = $collection;
+        }
+        return clone self::$collectionClasses[$dataTypeName];
+    }
+
+    /**
+     * @param iterable $objects
      * @return static
      */
-    public static function makeObjectCollection(string $descriptor, bool $allowNullItems = false,
-                                                bool $requireItemKey = false, string $itemKey = null)
+    public static function makeUnrestrictedCollection($objects = null)
     {
-        $collection = new static();
-        $collection->dataTypeName = $descriptor;
-        $collection->allowNullItems = $allowNullItems;
-        $collection->requireItemKey = $requireItemKey;
-        $collection->keyAttribute = $itemKey;
-        return $collection;
+        $static = (new static())->toUnrestrictedCollection();
+        return $objects ? $static->fill($objects) : $static;
     }
 
     /**
@@ -45,7 +79,40 @@ class ObjectCollection extends Collection implements Responsable, Collectionable
      */
     public static function setEnforceItemType(bool $enforceItemType): void
     {
-        self::$enforceItemType = $enforceItemType;
+        static::$enforceItemType = $enforceItemType;
+    }
+
+    /**
+     * Dynamically access collection proxies.
+     *
+     * @param string $key
+     * @return mixed
+     *
+     * @throws \Exception
+     */
+    public function __get($key)
+    {
+        if (!in_array($key, static::$proxies)) {
+            throw new Exception("Property [{$key}] does not exist on this collection instance.");
+        }
+
+        return new ObjectCollectionProxy($this, $key);
+    }
+
+    /**
+     * @return \Sayla\Objects\DataType\DataType
+     */
+    protected function dataType(): DataType
+    {
+        return self::getDataTypeManager()->get($this->getDataTypeName());
+    }
+
+    /**
+     * @return \Sayla\Objects\DataType\DataTypeDescriptor
+     */
+    protected function descriptor(): DataTypeDescriptor
+    {
+        return $this->dataType()->getDescriptor();
     }
 
     /**
@@ -71,18 +138,7 @@ class ObjectCollection extends Collection implements Responsable, Collectionable
     /**
      * @return string
      */
-    public function getDataTypeName(): string
-    {
-        return $this->dataTypeName;
-    }
-
-    /**
-     * @return \Sayla\Objects\DataType\DataTypeDescriptor
-     */
-    public function getItemDescriptor(): DataTypeDescriptor
-    {
-        return DataTypeManager::resolve()->getDescriptor($this->dataTypeName);
-    }
+    public abstract function getDataTypeName(): string;
 
     public function groupBy($groupBy, $preserveKeys = false)
     {
@@ -119,25 +175,15 @@ class ObjectCollection extends Collection implements Responsable, Collectionable
     }
 
     /**
-     * @param $item
-     * @return \Sayla\Objects\DataObject
-     * @throws \Sayla\Objects\Contract\Exception\HydrationError
-     */
-    protected function makeObject($item)
-    {
-        return DataTypeManager::resolve()->get($this->dataTypeName)->hydrate($item);
-    }
-
-    /**
      * @param $items
      * @return $this
      */
     public function makeObjects($items)
     {
         foreach ($items as $i => $item) {
-            if (!$item instanceof $this->dataTypeName) {
+            if (!$item instanceof IDataObject) {
                 if (filled($item)) {
-                    $this->push($this->makeObject($item));
+                    $this->push($this->dataType()->hydrate($item));
                 }
             } else {
                 $this->push($item);
@@ -152,7 +198,7 @@ class ObjectCollection extends Collection implements Responsable, Collectionable
      * @param mixed $key
      * @return mixed|null|Object
      */
-    public function offsetGet($key): ?DataObject
+    public function offsetGet($key): ?IDataObject
     {
         return $this->items[$key];
     }
@@ -193,8 +239,7 @@ class ObjectCollection extends Collection implements Responsable, Collectionable
      */
     public function resolve(...$attributes)
     {
-        $itemDescriptor = $this->getItemDescriptor();
-        $itemDescriptor->resolve($this, $attributes);
+        $this->descriptor()->resolveMany($this, $attributes);
         return $this;
     }
 
@@ -216,13 +261,33 @@ class ObjectCollection extends Collection implements Responsable, Collectionable
      */
     public function toResponse($request)
     {
-        if ($this->first() instanceof ResponsableObject) {
-            return new JsonResponse($this->map->getResponseObject($request));
-        }
-        if ($this->first() instanceof DataObject) {
-            return new JsonResponse($this->map->toVisibleObject());
-        }
-        return new JsonResponse($this->items);
+        return $this->dataType()
+            ->getResponseFactory()
+            ->makeCollectionResponse($request, $this);
+    }
+
+    /**
+     * @return static
+     */
+    public function toUnrestrictedCollection()
+    {
+        $static = clone $this;
+        $static->items = [];
+        $static->allowNullItems = true;
+        $static->requireItemKey = false;
+        return $static->fill($this->items);
+    }
+
+    /**
+     * @param string $keyAttribute
+     * @return static
+     */
+    public function useKey(string $keyAttribute)
+    {
+        $static = clone $this;
+        $static->items = [];
+        $static->keyAttribute = $keyAttribute;
+        return $static->fill($this->items);
     }
 
     protected function validateItemKey($key)
@@ -233,23 +298,23 @@ class ObjectCollection extends Collection implements Responsable, Collectionable
     }
 
     /**
-     * @param \Sayla\Objects\DataObject|mixed $value
+     * @param \Sayla\Objects\Contract\IDataObject $value
      */
     protected function validateItemType($value)
     {
         if ($this->allowNullItems && $value === null) {
             return;
         }
-        if (!self::$enforceItemType) {
-            return null;
+        if (!static::$enforceItemType) {
+            return;
         }
-        $itemDescriptor = $this->getItemDescriptor();
-        if (!is_a($value, $itemDescriptor->getObjectClass())
-            && !is_subclass_of($value, $itemDescriptor->getObjectClass())
-            && ($value->dataTypeName() != $itemDescriptor->getDataType())
-            && (get_class($value) != $itemDescriptor->getObjectClass())
-        ) {
-            throw new InvalidValue("An item must a '{$this->dataTypeName}' object");
+        if ($value::dataTypeName() != $this->getDataTypeName()) {
+            $objectClass = $this->dataType()->getObjectClass();
+            if (!is_a($value, $objectClass) && !is_subclass_of($value, $objectClass)) {
+                throw new InvalidValue(
+                    "Item must be a '{$this->getDataTypeName()}' object. Received a "
+                    . (is_object($value) ? get_class($value) : gettype($value)));
+            }
         }
     }
 }

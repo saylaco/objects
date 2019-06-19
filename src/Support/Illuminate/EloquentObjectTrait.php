@@ -16,15 +16,6 @@ trait EloquentObjectTrait
         return self::dataType()->hydrateMany(static::query()->toBase()->get());
     }
 
-    public static function findAll(array $filter)
-    {
-        $query = static::query();
-        $renamedData = self::dataType()->extract($filter);
-        $query->where($renamedData);
-        $results = $query->toBase()->get();
-        return self::dataType()->hydrateMany($results);
-    }
-
     /**
      * @param $id
      * @return static
@@ -36,6 +27,15 @@ trait EloquentObjectTrait
         return $model
             ? self::dataType()->hydrate($model)
             : null;
+    }
+
+    public static function findAll(array $filter)
+    {
+        $query = static::query();
+        $renamedData = self::dataType()->extract($filter);
+        $query->where($renamedData);
+        $results = $query->toBase()->get();
+        return self::dataType()->hydrateMany($results);
     }
 
     /**

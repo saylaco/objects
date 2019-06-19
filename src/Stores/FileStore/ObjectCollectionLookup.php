@@ -2,12 +2,16 @@
 
 namespace Sayla\Objects\Stores\FileStore;
 
+use Sayla\Objects\Contract\DataObject\SupportsDataTypeManager;
+use Sayla\Objects\Contract\DataObject\SupportsDataTypeManagerTrait;
 use Sayla\Objects\Contract\Stores\Lookup;
+use Sayla\Objects\DataType\DataType;
 use Sayla\Objects\DataType\DataTypeManager;
 use Sayla\Objects\ObjectCollection;
 
-class ObjectCollectionLookup implements Lookup
+class ObjectCollectionLookup implements Lookup, SupportsDataTypeManager
 {
+    use SupportsDataTypeManagerTrait;
     /** @var string */
     protected $dataType;
     /** @var string */
@@ -37,14 +41,10 @@ class ObjectCollectionLookup implements Lookup
      */
     public function all()
     {
-        $objectCollection = $this->objectCollectionClass::makeObjectCollection(
-            $this->dataType,
-            false,
-            true,
-            $this->keyAttribute
-        );
-        $objectCollection->makeObjects($this->records);
-        return $objectCollection;
+        return self::getDataTypeManager()->get($this->dataType)
+            ->newCollection()
+            ->useKey($this->keyAttribute)
+            ->makeObjects($this->records);
     }
 
     /**
@@ -54,7 +54,7 @@ class ObjectCollectionLookup implements Lookup
     public function find($key)
     {
         if (isset($this->records[$key])) {
-            return DataTypeManager::resolve()->get($this->dataType)->hydrate($this->records[$key]);
+            return $this->getDataType()->hydrate($this->records[$key]);
         }
         return $this->all()->firstWhere($this->keyAttribute, '=', $key);
     }
@@ -85,5 +85,15 @@ class ObjectCollectionLookup implements Lookup
     public function setObjectCollectionClass($objectCollectionClass): void
     {
         $this->objectCollectionClass = $objectCollectionClass;
+    }
+
+    /**
+     * @return \Sayla\Objects\DataType\DataType
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Sayla\Exception\Error
+     */
+    private function getDataType(): DataType
+    {
+        return DataTypeManager::resolve()->get($this->dataType);
     }
 }
