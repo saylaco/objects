@@ -23,7 +23,9 @@ use Sayla\Support\Bindings\ResolvesSelf;
 class DataTypeManager implements IteratorAggregate, Arrayable
 {
     use ResolvesSelf;
+    const AFTER_ADD_DATATYPE = 'dataTypes.added';
     const ON_BEFORE_INIT = 'dataTypes.beforeInit';
+    const ON_CONFIG = 'dataTypes.configuring';
     const ON_INIT = 'dataTypes.init';
     private static $instance;
     /** @var bool */
@@ -38,6 +40,8 @@ class DataTypeManager implements IteratorAggregate, Arrayable
     protected $registersProviders = true;
     /** @var \Sayla\Objects\Stores\StoreManager */
     protected $storeManager;
+    /** @var callable[] */
+    private $addDataTypeCallbacks = [];
     private $aliases = [];
     /** @var \Sayla\Objects\Builder\ClassScanner */
     private $classScanner;
@@ -45,8 +49,6 @@ class DataTypeManager implements IteratorAggregate, Arrayable
     private $configRepos = [];
     /** @var DataType[] */
     private $dataTypes = [];
-    /** @var callable[] */
-    private $postAddDataType = [];
 
     public function __construct(StoreManager $storeManager)
     {
@@ -92,6 +94,10 @@ class DataTypeManager implements IteratorAggregate, Arrayable
 
     protected function addConfig(DataTypeConfig $config)
     {
+        if ($this->dispatcher) {
+            $this->dispatcher->dispatch(self::ON_CONFIG, [$config]);
+            $this->dispatcher->dispatch(self::ON_CONFIG . ":{$config->getName()}", [$config]);
+        }
         if (!empty($config->getAlias()) && !isset($this->aliases[$config->getAlias()])) {
             $this->aliases[$config->getAlias()] = $config->getName();
         }
@@ -125,8 +131,8 @@ class DataTypeManager implements IteratorAggregate, Arrayable
         if ($dataType->hasStore()) {
             $dataType->setStoreResolver($this->getStoreResolver());
         }
-        if (filled($this->postAddDataType)) {
-            foreach ($this->postAddDataType as $callback) {
+        if (filled($this->addDataTypeCallbacks)) {
+            foreach ($this->addDataTypeCallbacks as $callback) {
                 call_user_func($callback, $dataType);
             }
         }
@@ -136,6 +142,10 @@ class DataTypeManager implements IteratorAggregate, Arrayable
             $objectClass::setDataTypeManager($this);
         }
         $config->runAddDataType($dataType);
+        if ($this->dispatcher) {
+            $this->dispatcher->dispatch(self::AFTER_ADD_DATATYPE, [$dataType]);
+            $this->dispatcher->dispatch(self::AFTER_ADD_DATATYPE . ":{$dataType->getName()}", [$dataType]);
+        }
         return $dataType;
     }
 
@@ -269,8 +279,38 @@ class DataTypeManager implements IteratorAggregate, Arrayable
 
     public function onAddDataType(callable $callback)
     {
-        $this->postAddDataType[] = $callback;
+        $this->addDataTypeCallbacks[] = $callback;
         return $this;
+    }
+
+    public function onBeforeInit($listener)
+    {
+        if (!$this->dispatcher) return;
+        $this->dispatcher->listen(self::ON_BEFORE_INIT, $listener);
+    }
+
+    public function onConfiguration($listener, string $name = null)
+    {
+        if (!$this->dispatcher) return;
+        if ($name) {
+            $this->dispatcher->listen(self::ON_CONFIG . ":{$name}", $listener);
+        }
+        $this->dispatcher->listen(self::ON_CONFIG, $listener);
+    }
+
+    public function onDataTypeAdded($listener, string $name = null)
+    {
+        if (!$this->dispatcher) return;
+        if ($name) {
+            $this->dispatcher->listen(self::AFTER_ADD_DATATYPE . ":{$name}", $listener);
+        }
+        $this->dispatcher->listen(self::AFTER_ADD_DATATYPE, $listener);
+    }
+
+    public function onInit($listener)
+    {
+        if (!$this->dispatcher) return;
+        $this->dispatcher->listen(self::ON_INIT, $listener);
     }
 
     public function setAlwaysScanClasses(bool $value)

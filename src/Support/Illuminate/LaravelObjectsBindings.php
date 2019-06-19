@@ -6,6 +6,7 @@ use Faker\Generator as FakerGenerator;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Validation\Factory;
 use Sayla\Objects\Attribute\PropertyType\OwnedDescriptorMixin;
+use Sayla\Objects\DataType\DataType;
 use Sayla\Objects\DataType\DataTypeManager;
 use Sayla\Objects\ObjectsBindings;
 use Sayla\Objects\Stubs\StubFactory;
@@ -23,7 +24,13 @@ class LaravelObjectsBindings extends ObjectsBindings implements RunsOnBoot
     public function booting($container, $qualifiedAliases): void
     {
         $container->extend(DataTypeManager::class, function (DataTypeManager $manager, $app) {
-            $manager->setDispatcher($app['events']);
+            $dispatcher = $app['events'];
+            $manager->setDispatcher($dispatcher);
+            if ($bootValidationFactory = $this->option('setDispatcher')) {
+                $manager->onDataTypeAdded(function (DataType $dataType) use ($dispatcher) {
+                    $dataType->setDispatcher($dispatcher);
+                });
+            }
             return $manager;
         });
         if ($bootValidationFactory = $this->option('bootValidationFactory')) {
@@ -56,10 +63,12 @@ class LaravelObjectsBindings extends ObjectsBindings implements RunsOnBoot
         $optionsResolver->setDefaults([
             'bootOwnerCallback' => true,
             'bootValidationFactory' => true,
-            'stubsPath' => null
+            'stubsPath' => null,
+            'setDispatcher' => true
         ]);
         $optionsResolver->setAllowedTypes('bootValidationFactory', ['boolean', 'string']);
         $optionsResolver->setAllowedTypes('bootOwnerCallback', 'boolean');
+        $optionsResolver->setAllowedTypes('setDispatcher', 'boolean');
         $optionsResolver->setAllowedTypes('stubsPath', 'string');
     }
 
