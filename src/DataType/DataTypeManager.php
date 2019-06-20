@@ -146,6 +146,10 @@ class DataTypeManager implements IteratorAggregate, Arrayable
             $this->dispatcher->dispatch(self::AFTER_ADD_DATATYPE, [$dataType]);
             $this->dispatcher->dispatch(self::AFTER_ADD_DATATYPE . ":{$dataType->getName()}", [$dataType]);
         }
+
+        if (!$dataType->hasDispatcher() && isset($this->dispatcher)) {
+            $dataType->setDispatcher($this->dispatcher);
+        }
         return $dataType;
     }
 

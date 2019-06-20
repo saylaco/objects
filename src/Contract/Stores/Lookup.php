@@ -28,9 +28,4 @@ interface Lookup
      * @return \Sayla\Objects\ObjectCollection
      */
     public function getWhere($attribute, $value);
-
-    /**
-     * @param \Sayla\Objects\ObjectCollection|string $objectCollectionClass
-     */
-    public function setObjectCollectionClass($objectCollectionClass): void;
 }

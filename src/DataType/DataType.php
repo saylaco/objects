@@ -215,6 +215,11 @@ final class DataType
         return $this->traits;
     }
 
+    public function hasDispatcher(): bool
+    {
+        return !empty($this->eventDispatcher);
+    }
+
     public function hasStore()
     {
         return $this->storeOptions !== null;

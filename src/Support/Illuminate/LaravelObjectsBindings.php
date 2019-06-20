@@ -4,107 +4,102 @@ namespace Sayla\Objects\Support\Illuminate;
 
 use Faker\Generator as FakerGenerator;
 use Illuminate\Contracts\Container\Container;
-use Illuminate\Contracts\Validation\Factory;
-use Sayla\Objects\Attribute\PropertyType\OwnedDescriptorMixin;
-use Sayla\Objects\DataType\DataType;
-use Sayla\Objects\DataType\DataTypeManager;
 use Sayla\Objects\ObjectsBindings;
 use Sayla\Objects\Stubs\StubFactory;
-use Sayla\Objects\Validation\ValidationBuilder;
-use Sayla\Support\Bindings\BindingSetBuilder;
+use Sayla\Objects\Support\Illuminate\DbCnxt\DbTableStore;
+use Sayla\Objects\Support\Illuminate\Eloquent\EloquentStore;
 use Sayla\Support\Bindings\Contract\RunsOnBoot;
 
 
 class LaravelObjectsBindings extends ObjectsBindings implements RunsOnBoot
 {
-    /**
-     * @param \Illuminate\Contracts\Foundation\Application $container
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function booting($container, $qualifiedAliases): void
+
+    public function booting($container, $aliases): void
     {
-        $container->extend(DataTypeManager::class, function (DataTypeManager $manager, $app) {
-            $dispatcher = $app['events'];
-            $manager->setDispatcher($dispatcher);
-            if ($bootValidationFactory = $this->option('setDispatcher')) {
-                $manager->onDataTypeAdded(function (DataType $dataType) use ($dispatcher) {
-                    $dataType->setDispatcher($dispatcher);
-                });
-            }
-            return $manager;
-        });
-        if ($bootValidationFactory = $this->option('bootValidationFactory')) {
-            $bootValidationFactory = is_bool($bootValidationFactory) ? 'validator' : $bootValidationFactory;
-            /** @var Factory $validator */
-            $validator = $container->make($bootValidationFactory);
-            $validator->extend('objExists', function ($attribute, $value, $args) use ($container, $qualifiedAliases) {
-                /** @var DataTypeManager $dataTypeManager */
-                $dataTypeManager = $container->get($qualifiedAliases['dataTypeManager']);
-                /** @var \Sayla\Objects\Stores\StoreManager $store */
-                return filled($value) ? $dataTypeManager
-                    ->get($args[0])->getStoreStrategy()
-                    ->exists($value) : false;
-            }, 'Object not found.');
-            ValidationBuilder::setSharedValidationFactory($validator);
+        $bootstrapper = new Bootstrapper($container, $aliases['dataTypeManager']);
+
+        if ($this->option('bootDispatcher')) {
+            $bootstrapper->bootDispatcher();
         }
-        if ($bootOwnerCallback = $this->option('bootOwnerCallback')) {
-            OwnedDescriptorMixin::setDefaultUserAttributeCallback(function (string $attributeName) {
-                /** @var \Illuminate\Auth\AuthManager $auth */
-                $auth = app('auth');
-                $guard = $auth->guard();
-                $authenticatable = $guard->user();
-                return $authenticatable->{$attributeName};
-            });
+        if ($bootValidationFactory = $this->option('bootValidation')) {
+            if (!is_bool($bootValidationFactory)) {
+                $bootstrapper->bootValidation($container->make($bootValidationFactory));
+            } else {
+                $bootstrapper->bootValidation();
+            }
+        }
+        if ($this->option('bootOwnerMixin')) {
+            $bootstrapper->bootOwnerMixin();
+        }
+
+        $bootstrapper->getDataTypeManager()->getStoreManager()
+            ->extend(DbTableStore::STORE_NAME, DbTableStore::class);
+        
+        if ($this->option('addEloquentStore')) {
+            $bootstrapper->getDataTypeManager()->getStoreManager()
+                ->extend(EloquentStore::STORE_NAME, EloquentStore::class);
         }
     }
 
     protected function configureOptions($optionsResolver): void
     {
         $optionsResolver->setDefaults([
-            'bootOwnerCallback' => true,
-            'bootValidationFactory' => true,
+            'bootOwnerMixin' => true,
+            'bootValidation' => true,
+            'addEloquentStore' => true,
             'stubsPath' => null,
-            'setDispatcher' => true
+            'bootDispatcher' => true
         ]);
-        $optionsResolver->setAllowedTypes('bootValidationFactory', ['boolean', 'string']);
-        $optionsResolver->setAllowedTypes('bootOwnerCallback', 'boolean');
-        $optionsResolver->setAllowedTypes('setDispatcher', 'boolean');
+        $optionsResolver->setAllowedTypes('bootValidation', ['boolean', 'string']);
+        $optionsResolver->setAllowedTypes('bootOwnerMixin', 'boolean');
+        $optionsResolver->setAllowedTypes('addEloquentStore', 'boolean');
+        $optionsResolver->setAllowedTypes('bootDispatcher', 'boolean');
         $optionsResolver->setAllowedTypes('stubsPath', 'string');
     }
 
-    /**
-     * @return array
-     */
-    protected function getBindingSet($setBuilder): array
+    protected function defineBindings($setBuilder)
     {
-        parent::getBindingSet($setBuilder);
-        $this->prepareLaravelBindings($setBuilder);
-        return $setBuilder->getBindings();
+        parent::defineBindings($setBuilder);
+        $setBuilder->add('objectStubs', StubFactory::class, function (Container $app) {
+            $stubFactory = new StubFactory(
+                $app->make(FakerGenerator::class),
+                $app->make($this->dataTypeManager)
+            );
+
+            if (filled($stubsPath = $this->option('stubsPath'))) {
+                $stubFactory->load($stubsPath);
+            }
+            return $stubFactory;
+        });
     }
 
-    protected function prepareLaravelBindings(BindingSetBuilder $setBuilder)
+    public function setAddDynamoStore($value = false)
     {
-        $setBuilder->add('objectStubs', StubFactory::class,
-            function (Container $app) {
-                $stubFactory = new StubFactory(
-                    $app->make(FakerGenerator::class),
-                    $app->make(DataTypeManager::class)
-                );
-
-                if (filled($stubsPath = $this->option('stubsPath'))) {
-                    $stubFactory->load($stubsPath);
-                }
-                return $stubFactory;
-            });
+        $this->setOption('addDynamoStore', $value);
+        return $this;
     }
 
-    /**
-     * @param bool $shouldBoot
-     * @return $this
-     */
-    public function setBootValidationFactory(bool $shouldBoot)
+    public function setAddEloquentStore($value = true)
     {
-        $this->setOption('bootValidationFactory', $shouldBoot);
+        $this->setOption('addEloquentStore', $value);
+        return $this;
+    }
+
+    public function setBootDispatcher($value = true)
+    {
+        $this->setOption('bootDispatcher', $value);
+        return $this;
+    }
+
+    public function setBootOwnerMixin($value = true)
+    {
+        $this->setOption('bootOwnerMixin', $value);
+        return $this;
+    }
+
+    public function setBootValidation($value = true)
+    {
+        $this->setOption('bootValidation', $value);
         return $this;
     }
 
@@ -117,5 +112,4 @@ class LaravelObjectsBindings extends ObjectsBindings implements RunsOnBoot
         $this->setOption('stubsPath', $laravelStubsPath);
         return $this;
     }
-
 }

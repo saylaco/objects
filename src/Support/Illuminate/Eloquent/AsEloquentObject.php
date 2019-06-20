@@ -1,11 +1,12 @@
 <?php
 
-namespace Sayla\Objects\Support\Illuminate;
+namespace Sayla\Objects\Support\Illuminate\Eloquent;
+
 /**
  * @mixin \Sayla\Objects\Contract\DataObject\StorableObjectTrait
  * @method static EloquentStore getStore
  */
-trait EloquentObjectTrait
+trait AsEloquentObject
 {
     /**
      * @return static[]

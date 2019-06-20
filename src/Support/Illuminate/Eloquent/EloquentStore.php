@@ -1,6 +1,6 @@
 <?php
 
-namespace Sayla\Objects\Support\Illuminate;
+namespace Sayla\Objects\Support\Illuminate\Eloquent;
 
 use Illuminate\Container\Container;
 use Illuminate\Database\Eloquent\Model;
@@ -14,6 +14,7 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class EloquentStore implements ObjectStore, ConfigurableStore, ModifiesObjectBehavior
 {
+    const STORE_NAME = 'Eloquent';
     /** @var Model */
     protected $model;
     protected $useTransactions = false;
@@ -36,7 +37,7 @@ class EloquentStore implements ObjectStore, ConfigurableStore, ModifiesObjectBeh
     public static function getObjectBehavior(): array
     {
         return [
-            EloquentObjectTrait::class
+            AsEloquentObject::class
         ];
     }
 
@@ -150,7 +151,7 @@ class EloquentStore implements ObjectStore, ConfigurableStore, ModifiesObjectBeh
     /**
      * @param Model $model
      * @param \Sayla\Objects\Contract\DataObject\StorableObject $object
-     * @return Model
+     * @return array
      */
     protected function updateModel($model, $object)
     {

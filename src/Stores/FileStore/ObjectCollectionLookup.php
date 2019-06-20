@@ -16,8 +16,6 @@ class ObjectCollectionLookup implements Lookup, SupportsDataTypeManager
     protected $dataType;
     /** @var string */
     protected $keyAttribute;
-    /** @var string|ObjectCollection */
-    protected $objectCollectionClass = ObjectCollection::class;
     /**
      * @var iterable
      */
@@ -77,14 +75,6 @@ class ObjectCollectionLookup implements Lookup, SupportsDataTypeManager
     public function getWhere($attribute, $value)
     {
         return $this->all()->where($attribute, '=', $value);
-    }
-
-    /**
-     * @param \Sayla\Objects\ObjectCollection|string $objectCollectionClass
-     */
-    public function setObjectCollectionClass($objectCollectionClass): void
-    {
-        $this->objectCollectionClass = $objectCollectionClass;
     }
 
     /**

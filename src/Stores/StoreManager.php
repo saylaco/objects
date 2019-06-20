@@ -9,7 +9,6 @@ use Sayla\Objects\Contract\Stores\ConfigurableStore;
 use Sayla\Objects\Contract\Stores\ObjectStore;
 use Sayla\Objects\Stores\FileStore\FileDataStore;
 use Sayla\Objects\Stores\FileStore\ReadFileDataStore;
-use Sayla\Objects\Support\Illuminate\EloquentStore;
 use Sayla\Support\Bindings\ResolvesSelf;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
@@ -17,7 +16,6 @@ class StoreManager
 {
     use ResolvesSelf;
     public const DEFAULT_DRIVERS = [
-        'Eloquent' => EloquentStore::class,
         'File' => FileDataStore::class,
         'ReadFile' => ReadFileDataStore::class,
     ];
@@ -81,11 +79,13 @@ class StoreManager
      * @param \Closure $callback
      * @return $this
      */
-    public function extend($driver, string $storeClass, Closure $callback)
+    public function extend($driver, string $storeClass, Closure $callback = null)
     {
         $this->customCreators[$driver] = [
             'storeClass' => $storeClass,
-            'callback' => $callback->bindTo($this, $this)
+            'callback' => $callback ? $callback->bindTo($this, $this) : function () use ($storeClass) {
+                return $this->container->make($storeClass);
+            }
         ];
         return $this;
     }

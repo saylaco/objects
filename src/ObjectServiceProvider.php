@@ -18,7 +18,7 @@ class ObjectServiceProvider extends LaravelServiceProvider
             ->setTags(['saylaObjects']);
     }
 
-    protected function getBindingProvider()
+    protected function getBindingProvider(): LaravelObjectsBindings
     {
         return (new LaravelObjectsBindings())
             ->setStubsPath($this->stubsPath ?? $this->app->databasePath('objectFactories'));
