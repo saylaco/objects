@@ -56,7 +56,7 @@ trait AsEloquentObject
 
     protected function determineExistence(): bool
     {
-        return $this->id > 0;
+        return filled($this->id);
     }
 
     /**
