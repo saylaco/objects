@@ -6,8 +6,8 @@ use Sayla\Objects\Contract\PropertyTypes\AttributePropertyType;
 
 class Type implements AttributePropertyType
 {
-    const NAME = 'type';
     const DEFAULT_TYPE = 'string';
+    const NAME = 'type';
 
     public static function getProviders(): array
     {

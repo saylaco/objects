@@ -35,6 +35,7 @@ class DbTableStore implements ObjectStore, ConfigurableStore, ModifiesObjectBeha
     protected $useTransactions = false;
 
     public static function defineOptions(OptionsResolver $resolver): void
+    public static function defineOptions($resolver): void
     {
         $resolver->setRequired('table');
         $resolver->setAllowedTypes('table', 'string');

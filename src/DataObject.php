@@ -64,7 +64,10 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
         return static::dataType()->getResponseFactory()->makeObjectResponse($request, $object);
     }
 
-    public static function newObjectCollection()
+    /**
+     * @return \Sayla\Objects\ObjectCollection|static[]
+     */
+    public static function newCollection()
     {
         return static::dataType()->newCollection();
     }
@@ -226,7 +229,7 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
         if (static::$unguarded) {
             return true;
         }
-        return $this::descriptor()->isWritable($attributeName);
+        return $this::descriptor()->isWritable($attributeName) || !$this->isAttributeSet($attributeName);
     }
 
     /**

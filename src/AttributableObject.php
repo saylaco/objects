@@ -65,6 +65,22 @@ class AttributableObject implements Attributable
     }
 
     /**
+     * Fill the model with an array of attributes.
+     *
+     * @param iterable $attributes
+     * @return $this
+     */
+    public function fillIf(iterable $attributes)
+    {
+        foreach ($attributes as $key => $value) {
+            if (!isset($this->attributes[$key])) {
+                $this->setAttributeValue($key, value($value));
+            }
+        }
+        return $this;
+    }
+
+    /**
      * @param string $attributeName
      * @return string
      */

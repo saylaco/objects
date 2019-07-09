@@ -13,7 +13,6 @@ use Sayla\Objects\Contract\Stores\ModifiesObjectBehavior;
 use Sayla\Objects\Contract\Stores\ObjectStore;
 use Sayla\Objects\DataType\DataTypeManager;
 use Symfony\Component\OptionsResolver\Options;
-use Symfony\Component\OptionsResolver\OptionsResolver;
 use UnexpectedValueException;
 
 class FileDataStore implements ObjectStore, ConfigurableStore, ModifiesObjectBehavior
@@ -40,7 +39,7 @@ class FileDataStore implements ObjectStore, ConfigurableStore, ModifiesObjectBeh
      */
     private $shortName;
 
-    public static function defineOptions(OptionsResolver $resolver): void
+    public static function defineOptions($resolver): void
     {
         $resolver->setDefaults([
             'primaryKey' => 'id',

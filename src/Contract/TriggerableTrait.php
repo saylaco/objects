@@ -35,7 +35,7 @@ trait TriggerableTrait
      */
     public function __invoke(string $name, ...$args)
     {
-        $dataTypeName = $this->dataTypeName();
+        $dataTypeName = $this::dataTypeName();
         if (!isset(self::$calledTriggers[$dataTypeName][$name])) {
             self::$calledTriggers[$dataTypeName][$name] = 1;
         } else {

@@ -59,7 +59,7 @@ class ObjectCollectionProxy extends HigherOrderCollectionProxy
         if ($results instanceof Collection) {
             $first = $results->first();
             if ($first instanceof DataObject) {
-                return $first::newObjectCollection()->fill($results);
+                return $first::newCollection()->fill($results);
             } elseif ($first instanceof IDataObject) {
                 return ObjectCollection::makeFor($first::dataTypeName())->fill($results);
             }

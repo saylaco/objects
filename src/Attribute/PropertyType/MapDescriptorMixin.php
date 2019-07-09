@@ -26,6 +26,23 @@ class MapDescriptorMixin implements Mixin
         return $mappedData;
     }
 
+    public function getAttributeMapping($key)
+    {
+        return $this->mappable[$key];
+    }
+
+    public function getHydrationMap()
+    {
+        $keyByRawName = [];
+        foreach ($this->mappable as $attributeName => $property) {
+            if ($property['from']) {
+                $keyByRawName[$property['from']] = $property['attribute'];
+                continue;
+            }
+        }
+        return $keyByRawName;
+    }
+
     /**
      * @return array
      */
@@ -36,7 +53,7 @@ class MapDescriptorMixin implements Mixin
 
     public function hydrate($data)
     {
-        $mappedData = array_except($data, $this->mappable->keys()->all());
+        $mappedData = [];
         foreach ($this->mappable as $attributeName => $property) {
             if ($property['from']) {
                 $value = data_get($data, $property['from']);

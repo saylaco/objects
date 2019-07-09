@@ -40,7 +40,7 @@ if (!function_exists('build_value')) {
      * @param \Sayla\Objects\Transformers\Options|array|null $options
      * @return mixed
      */
-    function build_value(string $transformer, $value, $options = null)
+    function build_value(string $transformer, $value = null, $options = null)
     {
         return TransformerFactory::resolve()
             ->getTransformer($transformer, $options)

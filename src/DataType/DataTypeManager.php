@@ -179,6 +179,11 @@ class DataTypeManager implements IteratorAggregate, Arrayable
         return new ArrayIterator($this->dataTypes);
     }
 
+    public function getDataTypeNames()
+    {
+        return array_keys($this->dataTypes);
+    }
+
     public function getObjectClass(string $name): string
     {
         return $this->get($name)->getDescriptor()->getObjectClass();

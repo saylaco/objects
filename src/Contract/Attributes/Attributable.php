@@ -14,7 +14,7 @@ interface Attributable extends Jsonable, Arrayable, JsonSerializable, ArrayAcces
      * Populate with an array of attributes.
      *
      * @param iterable $attributes
-     * @return self
+     * @return $this
      */
     public function fill(iterable $attributes);
 

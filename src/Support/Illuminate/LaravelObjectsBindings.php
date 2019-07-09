@@ -34,7 +34,7 @@ class LaravelObjectsBindings extends ObjectsBindings implements RunsOnBoot
 
         $bootstrapper->getDataTypeManager()->getStoreManager()
             ->extend(DbTableStore::STORE_NAME, DbTableStore::class);
-        
+
         if ($this->option('addEloquentStore')) {
             $bootstrapper->getDataTypeManager()->getStoreManager()
                 ->extend(EloquentStore::STORE_NAME, EloquentStore::class);

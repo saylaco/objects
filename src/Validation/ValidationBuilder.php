@@ -86,6 +86,11 @@ class ValidationBuilder
         return $this->validationFactory ?? self::$sharedValidationFactory;
     }
 
+    public function hasRules()
+    {
+        return !empty($this->rules);
+    }
+
     /**
      * @param array $customAttributes
      * @return array
@@ -131,7 +136,7 @@ class ValidationBuilder
     /**
      * @param iterable $allRules
      * @param array|null $extraProperties
-     * @return iterable
+     * @return array
      */
     public function prepareRules(iterable $allRules, array $extraProperties = null)
     {
@@ -248,5 +253,15 @@ class ValidationBuilder
             throw new EntityValidationException($validator, $this->entityName);
         }
         return $validator;
+    }
+
+    /**
+     * @param string $entityName
+     * @return ValidationBuilder
+     */
+    public function setEntityName(string $entityName): ValidationBuilder
+    {
+        $this->entityName = $entityName;
+        return $this;
     }
 }
