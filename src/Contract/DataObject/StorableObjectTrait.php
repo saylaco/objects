@@ -2,6 +2,7 @@
 
 namespace Sayla\Objects\Contract\DataObject;
 
+use Illuminate\Support\Arr;
 use Sayla\Objects\Contract\Storable;
 use Sayla\Objects\Contract\Stores\ObjectStore;
 use Sayla\Objects\DataType\DataTypeManager;
@@ -68,21 +69,19 @@ trait StorableObjectTrait
             return $this;
         }
         $instance = $this->getStorable();
+        $instance(Storable::ON_BEFORE_SAVE);
         try {
             $instance->storing = true;
-            $instance(Storable::ON_BEFORE_SAVE);
             $instance(Storable::ON_BEFORE_CREATE);
             $newAttributes = static::getStore()->create($instance);
-            if (is_iterable($newAttributes)) {
-                $instance->init($instance::dataType()->hydrateData($newAttributes));
-            }
+            $instance->initStoreValues($newAttributes);
             $instance(Storable::ON_AFTER_CREATE);
-            $instance->clearModifiedAttributeFlags();
             $instance->exists = true;
-            $instance(Storable::ON_AFTER_SAVE);
         } finally {
             $instance->storing = false;
         }
+        $instance(Storable::ON_AFTER_SAVE);
+        $instance->clearModifiedAttributeFlags();
         return $instance;
     }
 
@@ -98,9 +97,7 @@ trait StorableObjectTrait
         try {
             $instance(Storable::ON_BEFORE_DELETE);
             $newAttributes = static::getStore()->delete($instance);
-            if (is_iterable($newAttributes)) {
-                $instance->init($instance::dataType()->hydrateData($newAttributes));
-            }
+            $instance->initStoreValues($newAttributes);
             $instance(Storable::ON_AFTER_DELETE);
             $instance->clearModifiedAttributeFlags();
             $instance->exists = false;
@@ -159,20 +156,29 @@ trait StorableObjectTrait
     {
         $instance = $this->getStorable();
         try {
-            $instance->storing = true;
             $instance(Storable::ON_BEFORE_SAVE);
+            $instance->storing = true;
             $instance(Storable::ON_BEFORE_UPDATE);
             $newAttributes = static::getStore()->update($instance);
-            if (is_iterable($newAttributes)) {
-                $instance->init($instance::dataType()->hydrateData($newAttributes));
-            }
+            $instance->initStoreValues($newAttributes);
             $instance(Storable::ON_AFTER_UPDATE);
-            $instance->clearModifiedAttributeFlags();
             $instance->exists = true;
-            $instance(Storable::ON_AFTER_SAVE);
         } finally {
             $instance->storing = false;
         }
+        $instance(Storable::ON_AFTER_SAVE);
+        $instance->clearModifiedAttributeFlags();
         return $instance;
+    }
+
+    private function initStoreValues(iterable $newRawData)
+    {
+        if (is_iterable($newRawData) && filled($newRawData)) {
+            $validAttrs = $this::dataType()->getDescriptor()->getHydrationMap();
+            $hydrated = $this::dataType()->hydrateData($newRawData);
+            $subset = array_intersect_key($validAttrs, $newRawData);
+            $hydrated = Arr::only($hydrated, $subset);
+            $this->init($hydrated);
+        }
     }
 }
