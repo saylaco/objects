@@ -8,10 +8,12 @@ use Sayla\Util\Mixin\Mixin;
 
 class TransformationDescriptorMixin implements Mixin
 {
-    private $transformations = [];
-    private $transformer;
+    private $createTransformations = [];
     /** @var \Sayla\Objects\Transformers\TransformerFactory */
     private $factory;
+    private $transformations = [];
+    private $transformers = [];
+    private $updateTransformations = [];
 
     /**
      * @param \Sayla\Objects\Attribute\Property[] $transformations
@@ -19,8 +21,44 @@ class TransformationDescriptorMixin implements Mixin
     public function __construct(array $transformations)
     {
         foreach ($transformations as $attr => $transformation) {
-            $this->transformations[$attr] = $transformation->getValue();
+            $options = $transformation->getValue();
+            unset($options['onCreate']);
+            unset($options['onUpdate']);
+
+            if (isset($transformation['onCreate']) && $transformation['onCreate']) {
+                $this->createTransformations[$attr] = array_merge($options, ['always' => true]);
+            }
+            if (isset($transformation['onUpdate']) && $transformation['onUpdate']) {
+                $this->updateTransformations[$attr] = array_merge($options, ['always' => true]);
+            }
+            $this->transformations[$attr] = $options;
         }
+    }
+
+    /**
+     * @return \Sayla\Objects\Transformers\Transformer
+     */
+    public function getOnCreateTransformer(): Transformer
+    {
+        return $this->transformers['create']
+            ?? $this->transformers['create'] = $this->makeTransformer($this->createTransformations, null);
+    }
+
+    /**
+     * @return \Sayla\Objects\Transformers\Transformer
+     */
+    public function getOnUpdateTransformer(): Transformer
+    {
+        return $this->transformers['update']
+            ?? $this->transformers['update'] = $this->makeTransformer($this->updateTransformations, null);
+    }
+
+    /**
+     * @return string[]
+     */
+    public function getTransformable(): array
+    {
+        return array_keys($this->transformations);
     }
 
     /**
@@ -28,26 +66,33 @@ class TransformationDescriptorMixin implements Mixin
      */
     public function getTransformer(array $excludedAttributes = null): Transformer
     {
+        return $this->makeTransformer($this->transformations, $excludedAttributes);
+    }
+
+    /**
+     * @param \Sayla\Objects\Transformers\TransformerFactory $valueFactory
+     */
+    public function setTransformerFactory(TransformerFactory $valueFactory): void
+    {
+        $this->factory = $valueFactory;
+    }
+
+    /**
+     * @param array $transformations
+     * @param array|null $excludedAttributes
+     * @return \Sayla\Objects\Transformers\Transformer
+     */
+    private function makeTransformer(array $transformations, ?array $excludedAttributes): Transformer
+    {
         if (empty($excludedAttributes)) {
-            if (!isset($this->transformer)) {
-                $this->transformer = new Transformer($this->transformations);
-            }
-            $transformer = $this->transformer;
+            $transformer = new Transformer($transformations);
         } else {
-            $transformer = new Transformer(array_except($this->transformations, $excludedAttributes));
+            $transformer = new Transformer(array_except($transformations, $excludedAttributes));
         }
 
         if (isset($this->factory)) {
             $transformer->setFactory($this->factory);
         }
         return $transformer;
-    }
-
-    /**
-     * @param \Sayla\Objects\Transformers\TransformerFactory $valueFactory
-     */
-    public function setValueFactory(TransformerFactory $valueFactory): void
-    {
-        $this->factory = $valueFactory;
     }
 }

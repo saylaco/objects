@@ -14,7 +14,7 @@ class UidTransformer implements ValueTransformer
      */
     public function build($value)
     {
-        if (empty($value) && $this->options->get('autoBuild', false)) {
+        if ($this->options->get('always')) {
             return (string)Uuid::uuid4();
         }
         return $value;

@@ -2,14 +2,16 @@
 
 namespace Sayla\Objects\Transformers\Transformer;
 
+use Illuminate\Contracts\Support\Jsonable;
 use Sayla\Objects\AttributableObject;
 use Sayla\Objects\Contract\DataObject\SupportsDataTypeManager;
 use Sayla\Objects\Contract\DataObject\SupportsDataTypeManagerTrait;
 use Sayla\Objects\DataObject;
 use Sayla\Objects\Transformers\AttributeValueTransformer;
+use Sayla\Objects\Transformers\SmashesToHashMap;
 use Sayla\Objects\Transformers\ValueTransformerTrait;
 
-class ObjectTransformer implements AttributeValueTransformer, SupportsDataTypeManager
+class ObjectTransformer implements AttributeValueTransformer, SupportsDataTypeManager, SmashesToHashMap
 {
     use ValueTransformerTrait;
     use SupportsDataTypeManagerTrait;
@@ -27,10 +29,12 @@ class ObjectTransformer implements AttributeValueTransformer, SupportsDataTypeMa
         if (is_string($value)) {
             $value = json_decode($value, true);
         }
-        if (empty($value) && $this->options->allowNullOnEmpty) {
-            return null;
+        if (empty($value) && !$this->options->get('always')) {
+            if ($this->options->allowNullOnEmpty) {
+                return null;
+            }
         }
-        $attributes = $value ?? [];
+        $attributes = $value ?: [];
         $dataType = $this->getDataType();
         return self::getDataTypeManager()->get($dataType)->hydrate($attributes);
     }
@@ -45,7 +49,7 @@ class ObjectTransformer implements AttributeValueTransformer, SupportsDataTypeMa
 
     public function getScalarType(): ?string
     {
-        return 'array';
+        return 'string';
     }
 
     public function getVarType(): string
@@ -62,13 +66,16 @@ class ObjectTransformer implements AttributeValueTransformer, SupportsDataTypeMa
 
     /**
      * @param mixed $value
-     * @return array
+     * @return string
      */
     public function smash($value)
     {
-        if ($value instanceof AttributableObject) {
-            return $value->jsonSerialize();
+        if ($value instanceof Jsonable) {
+            return $value->toJson();
         }
-        return (array)$value;
+        if ($value instanceof AttributableObject) {
+            return json_encode($value->jsonSerialize());
+        }
+        return json_encode($value);
     }
 }

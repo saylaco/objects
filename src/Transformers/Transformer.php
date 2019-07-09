@@ -20,6 +20,7 @@ class Transformer
      * @var TransformerFactory
      */
     private static $factoryInstance;
+    protected $optionNamesKeyedByAlias = [];
     /**
      * Definitions for transforming data types
      * @var mixed[][]
@@ -78,7 +79,7 @@ class Transformer
         if ($options->alias) {
             $aliasOptions = $optionsArray;
             $aliasOptions['aliasOf'] = $name;
-            $this->options[$options->alias] = new Options($aliasOptions);
+            $this->optionNamesKeyedByAlias[$options->alias] = $name;
         }
         $this->options[$name] = $options;
     }
@@ -92,7 +93,7 @@ class Transformer
     public function build(string $key, $value = null)
     {
         try {
-            if ($this->isNotTransformable($key)) {
+            if ($this->isNotBuildable($key)) {
                 return $value;
             }
             return $this->callBuilder($key, $value);
@@ -125,16 +126,36 @@ class Transformer
      * @return array
      * @throws \Sayla\Exception\Error
      */
-    public function buildOnly(array $attributes): array
+    public function buildAny(array $attributes): array
     {
         if (count($this->options) == 0) {
             return $attributes;
         }
         $built = [];
         foreach ($attributes as $k => $v) {
-            if (isset($this->options[$k])) {
-                $built[$k] = $this->build($k, $v);
+            if (
+                ($this->skipNonAttributes && !$this->isAttribute($k))
+                || !isset($this->options[$k])) {
+                continue;
             }
+            $built[$k] = $this->build($k, $v);
+        }
+        return $built;
+    }
+
+    /**
+     * @param array $attributes
+     * @return array
+     * @throws \Sayla\Exception\Error
+     */
+    public function buildOnly(array $attributes): array
+    {
+        if (count($this->options) == 0) {
+            return $attributes;
+        }
+        $built = [];
+        foreach ($this->getAttributeNames() as $k) {
+            $built[$k] = $this->build($k, $attributes[$k] ?? null);
         }
         return $built;
     }
@@ -230,6 +251,7 @@ class Transformer
      */
     public function getValueTransformer($key): ValueTransformer
     {
+        $key = $this->optionNamesKeyedByAlias[$key] ?? $key;
         if (isset($this->valueTransformers[$key])) {
             return $this->valueTransformers[$key];
         }
@@ -255,14 +277,23 @@ class Transformer
      */
     public function isAttribute(string $attr): bool
     {
-        return isset($this->options[$attr]);
+        return isset($this->options[$attr]) || isset($this->optionNamesKeyedByAlias[$attr]);
     }
 
     /**
      * @param $key
      * @return bool
      */
-    protected function isNotTransformable($key): bool
+    protected function isNotBuildable($key): bool
+    {
+        return ($this->skipNonAttributes && !$this->isAttribute($key));
+    }
+
+    /**
+     * @param $key
+     * @return bool
+     */
+    protected function isNotSmashable($key): bool
     {
         return ($this->skipNonAttributes && !$this->isAttribute($key))
             || ($this->isAttribute($key)
@@ -307,7 +338,7 @@ class Transformer
     public function smash(string $key, $value = null)
     {
         try {
-            if ($this->isNotTransformable($key)) {
+            if ($this->isNotSmashable($key)) {
                 return $value;
             }
             return $this->callSmasher($key, $value);
@@ -327,9 +358,6 @@ class Transformer
             return $attributes;
         }
         foreach ($attributes as $k => $v) {
-            if ($this->skipNonAttributes && !$this->isAttribute($k)) {
-                continue;
-            }
             $attributes[$k] = $this->smash($k, $v);
         }
         return $attributes;
@@ -346,10 +374,8 @@ class Transformer
             return $attributes;
         }
         $smashed = [];
-        foreach ($attributes as $k => $v) {
-            if (isset($this->options[$k])) {
-                $smashed[$k] = $this->smash($k, $v);
-            }
+        foreach ($this->getAttributeNames() as $k) {
+            $smashed[$k] = $this->smash($k, $attributes[$k] ?? null);
         }
         return $smashed;
     }

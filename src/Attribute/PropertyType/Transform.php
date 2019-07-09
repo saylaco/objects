@@ -2,6 +2,7 @@
 
 namespace Sayla\Objects\Attribute\PropertyType;
 
+use Sayla\Objects\Contract\DataObject\StorableObject;
 use Sayla\Objects\Contract\IDataObject;
 use Sayla\Objects\Contract\PropertyTypes\AttributePropertyType;
 use Sayla\Objects\DataType\DataTypeManager;
@@ -28,15 +29,23 @@ class Transform implements AttributePropertyType
                 /** @var TransformationDescriptorMixin|\Sayla\Objects\DataType\DataTypeDescriptor $descriptor */
                 $descriptor = $context->descriptor;
                 $transformer = $descriptor->getTransformer()->skipNonAttributes();
-                foreach ($context->attributes as $k => $v) {
-                    $context->attributes[$k] = $transformer->smash($k, $v);
-
-                }
+                $attributes =  $transformer->smashAll($context->attributes);
+                $context->attributes = $attributes;
                 return $next($context);
             },
             self::PROVIDER_DESCRIPTOR_MIXIN => function (string $dataType, array $properties): Mixin {
                 return new TransformationDescriptorMixin($properties);
-            }
+            },
+            self::ON_BEFORE_CREATE => function (StorableObject $object) {
+                $transformer = $object::descriptor()->getOnCreateTransformer();
+                $newValues = $transformer->skipNonAttributes()->buildOnly($object->toArray());
+                $object->fill($newValues);
+            },
+            self::ON_BEFORE_UPDATE => function (StorableObject $object) {
+                $transformer = $object::descriptor()->getOnUpdateTransformer();
+                $newValues = $transformer->skipNonAttributes()->buildOnly($object->toArray());
+                $object->fill($newValues);
+            },
         ];
     }
 

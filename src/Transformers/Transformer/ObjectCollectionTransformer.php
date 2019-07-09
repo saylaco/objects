@@ -35,12 +35,12 @@ class ObjectCollectionTransformer implements AttributeValueTransformer, Supports
      */
     protected function getDataType()
     {
-        return $this->options->dataType ?? $this->options->itemClass;
+        return $this->options->dataType ?? $this->options->item;
     }
 
     public function getScalarType(): ?string
     {
-        return null;
+        return 'string';
     }
 
     public function getVarType(): string
@@ -61,7 +61,7 @@ class ObjectCollectionTransformer implements AttributeValueTransformer, Supports
             /** @var DataObject|string $dataType */
             $dataType = $this->getDataType();
             if (is_subclass_of($dataType, DataObject::class)) {
-                return $dataType::newObjectCollection();
+                return $dataType::newCollection();
             }
             return $this->options->get('restricted', true)
                 ? self::getDataTypeManager()->get($dataType)->newCollection()->toUnrestrictedCollection()

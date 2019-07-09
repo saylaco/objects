@@ -1,6 +1,8 @@
 <?php namespace Sayla\Objects\Transformers\Transformer;
 
-class ListTransformer extends ArrayTransformer
+use Sayla\Objects\Transformers\SmashesToList;
+
+class ListTransformer extends ArrayTransformer implements SmashesToList
 {
     /**
      * @param mixed $value
@@ -9,6 +11,11 @@ class ListTransformer extends ArrayTransformer
     public function build($value)
     {
         return array_values(parent::build($value));
+    }
+
+    public function getScalarType(): ?string
+    {
+        return 'array';
     }
 
     /**

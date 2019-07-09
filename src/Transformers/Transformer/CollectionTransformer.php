@@ -1,10 +1,11 @@
 <?php namespace Sayla\Objects\Transformers\Transformer;
 
 use Illuminate\Support\Collection;
+use Sayla\Objects\Transformers\SmashesToList;
 use Sayla\Objects\Transformers\ValueTransformer;
 use Sayla\Objects\Transformers\ValueTransformerTrait;
 
-class CollectionTransformer implements ValueTransformer
+class CollectionTransformer implements ValueTransformer, SmashesToList
 {
     use ValueTransformerTrait;
 

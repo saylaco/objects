@@ -4,11 +4,12 @@ use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Contracts\Support\Jsonable;
 use JsonSerializable;
 use Sayla\Data\DotArrayObject;
+use Sayla\Objects\Transformers\AttributeValueTransformer;
 use Sayla\Objects\Transformers\ValueTransformer;
 use Sayla\Objects\Transformers\ValueTransformerTrait;
 use Sayla\Util\JsonHelper;
 
-class JsonTransformer implements ValueTransformer
+class JsonTransformer implements ValueTransformer, AttributeValueTransformer
 {
     use ValueTransformerTrait;
 
@@ -18,7 +19,7 @@ class JsonTransformer implements ValueTransformer
      */
     public function build($value)
     {
-        $class = $this->options->get('class', DotArrayObject::class);
+        $class = $this->getClassName();
         if (empty($value)) {
             return new $class();
         }
@@ -49,9 +50,27 @@ class JsonTransformer implements ValueTransformer
         return $constructorValue;
     }
 
+    /**
+     * @return mixed|null
+     */
+    protected function getClassName()
+    {
+        return $this->options->get('class', DotArrayObject::class);
+    }
+
     public function getScalarType(): string
     {
         return 'string';
+    }
+
+    /**
+     * @param $value
+     * @return mixed
+     */
+    protected function prepareSmashedValue($value)
+    {
+        $output = $value;
+        return $output;
     }
 
     /**
@@ -60,7 +79,7 @@ class JsonTransformer implements ValueTransformer
      */
     public function smash($value)
     {
-        $output = $value;
+        $output = $this->prepareSmashedValue($value);
         if ($output instanceof Jsonable) {
             $output = $output->toJson();
         } elseif ($output instanceof JsonSerializable) {
@@ -73,5 +92,10 @@ class JsonTransformer implements ValueTransformer
             $output = JsonHelper::encode($output ?: []);
         }
         return $output;
+    }
+
+    public function getVarType(): string
+    {
+        return 'mixed[]';
     }
 }
