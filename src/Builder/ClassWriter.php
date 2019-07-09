@@ -2,6 +2,8 @@
 
 namespace Sayla\Objects\Builder;
 
+use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 use Nette\PhpGenerator\ClassType;
 use Nette\PhpGenerator\PhpNamespace;
 use Nette\PhpGenerator\PsrPrinter;
@@ -18,6 +20,8 @@ use Sayla\Objects\DataType\DataTypeDescriptor;
 use Sayla\Objects\DataType\DataTypeManager;
 use Sayla\Objects\Stores\StoreManager;
 use Sayla\Objects\Transformers\AttributeValueTransformer;
+use Sayla\Objects\Transformers\SmashesToHashMap;
+use Sayla\Objects\Transformers\SmashesToList;
 use Throwable;
 
 class ClassWriter
@@ -62,64 +66,8 @@ class ClassWriter
     {
         /** @var \Sayla\Objects\Attribute\PropertyType\TransformationDescriptorMixin $transformerMixin */
         $descriptor = $dataType->getDescriptor();
-        $transformerMixin = $descriptor->getMixin(TransformationDescriptorMixin::class);
-        $transformer = $transformerMixin->getTransformer();
-        $varTypes = [];
-
-        foreach ($descriptor->getResolvable() as $attributeName) {
-            $resolver = $descriptor->getResolver($attributeName);
-            if ($resolver instanceof AssociationResolver) {
-                try {
-                    $varType = qualify_var_type(DataTypeManager::resolve()
-                        ->getDescriptor($resolver->getAssociatedDataType())
-                        ->getObjectClass());
-                } catch (Throwable $throwable) {
-                    $varType = qualify_var_type($resolver->getAssociatedDataType());
-                }
-
-                if (!$resolver->isSingular()) {
-                    $varType .= '[]';
-                }
-
-                $varTypes[$attributeName] = $varType;
-            }
-        }
-
-        foreach ($descriptor->getResolvable() as $attributeName) {
-            $resolver = $descriptor->getResolver($attributeName);
-            if ($resolver instanceof AssociationResolver) {
-                try {
-                    $varType = qualify_var_type(DataTypeManager::resolve()
-                        ->getDescriptor($resolver->getAssociatedDataType())
-                        ->getObjectClass());
-                } catch (Throwable $throwable) {
-                    $varType = qualify_var_type($resolver->getAssociatedDataType());
-                }
-
-                if (!$resolver->isSingular()) {
-                    $varType .= '[]';
-                }
-                $varTypes[$attributeName] = $varType;
-            }
-        }
-
-        foreach (array_sort($transformer->getAttributeNames()) as $attributeName) {
-            try {
-                $valueTransformer = $transformer->getValueTransformer($attributeName);
-                $varType =
-                    $valueTransformer instanceof AttributeValueTransformer
-                        ? qualify_var_type($valueTransformer->getVarType())
-                        : $valueTransformer->getScalarType() ?: ($dataType
-                        ->getAttributes()
-                        ->getAttribute($attributeName)
-                        ->getTypeHandle());
-            } catch (Error $exception) {
-                $varType = $transformer->getAttributeOptions()[$attributeName]['type'];
-            }
-            $varTypes[$attributeName] = $varType;
-        }
-        foreach ($varTypes as $attributeName => $varType)
-            $class->addComment('@property ' . $varType . ' ' . $attributeName);
+        foreach ($descriptor->getVarTypes() as $attributeName => $varTypes)
+            $class->addComment('@property ' . join('|', $varTypes) . ' ' . $attributeName);
     }
 
     protected function createFile(ClassType ...$classes): void

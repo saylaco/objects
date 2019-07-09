@@ -2,8 +2,16 @@
 
 namespace Sayla\Objects\DataType;
 
+use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
+use Sayla\Exception\Error;
+use Sayla\Objects\Contract\Attributes\AssociationResolver;
+use Sayla\Objects\Transformers\AttributeValueTransformer;
+use Sayla\Objects\Transformers\SmashesToHashMap;
+use Sayla\Objects\Transformers\SmashesToList;
 use Sayla\Util\Mixin\MixinSet;
 use Serializable;
+use Throwable;
 
 /**
  * Class DataTypeDescriptor
@@ -77,6 +85,58 @@ class DataTypeDescriptor implements Serializable
     public function getObjectClass(): string
     {
         return $this->class;
+    }
+
+    public function getVarTypes()
+    {
+        $varTypes = [];
+        $transformer = $this->getTransformer();
+        foreach ($this->getResolvable() as $attributeName) {
+            $resolver = $this->getResolver($attributeName);
+            if ($resolver instanceof AssociationResolver) {
+                try {
+                    $varType = qualify_var_type(DataTypeManager::resolve()
+                        ->getDescriptor($resolver->getAssociatedDataType())
+                        ->getObjectClass());
+                } catch (Throwable $throwable) {
+                    $varType = qualify_var_type($resolver->getAssociatedDataType());
+                }
+
+                if (!$resolver->isSingular()) {
+                    $varType .= '[]';
+                }
+
+                $varTypes[$attributeName] = [$varType];
+            }
+        }
+
+        foreach (Arr::sort($transformer->getAttributeNames()) as $attributeName) {
+            try {
+                $valueTransformer = $transformer->getValueTransformer($attributeName);
+                $_varTypes = array_map(
+                    'qualify_var_type',
+                    explode('|', $valueTransformer instanceof AttributeValueTransformer
+                        ? $valueTransformer->getVarType()
+                        : $valueTransformer->getScalarType() ?: 'mixed')
+                );
+                if (!$valueTransformer instanceof AttributeValueTransformer
+                    && ($valueTransformer instanceof SmashesToHashMap || $valueTransformer instanceof SmashesToList)) {
+                    $isIterable = false;
+                    foreach ($_varTypes as $varType)
+                        if ($isIterable = Str::contains($varType, ['[', ']'])) {
+                            break;
+                        }
+                    if (!$isIterable) {
+                        $_varTypes[0] = Str::finish($_varTypes[0], '[]');
+                    }
+                };
+
+            } catch (Error $exception) {
+                $_varTypes = [$transformer->getAttributeOptions()[$attributeName]['type']];
+            }
+            $varTypes[$attributeName] = $_varTypes;
+        }
+        return $varTypes;
     }
 
     public function hasMixin(string $mixinClassOrName)
