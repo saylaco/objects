@@ -4,13 +4,17 @@ namespace Sayla\Objects\Attribute\PropertyType;
 
 use Sayla\Objects\Attribute\Resolver\CallableResolver;
 use Sayla\Objects\Attribute\Resolver\ResolverDelegate;
+use Sayla\Objects\Contract\Attributes\AssociationResolver;
 use Sayla\Objects\Contract\Attributes\AttributeResolver;
 use Sayla\Objects\Contract\DataObject\ProvidesResolvers;
 use Sayla\Objects\Contract\PropertyTypes\AttributePropertyType;
 use Sayla\Objects\Contract\PropertyTypes\ModifiesAttributeDescriptor;
+use Sayla\Objects\Contract\PropertyTypes\NormalizesPropertyValue;
+use Sayla\Objects\DataType\DataTypeManager;
 use Sayla\Util\Mixin\Mixin;
+use Throwable;
 
-class Resolver implements AttributePropertyType, ModifiesAttributeDescriptor
+class Resolver implements AttributePropertyType, ModifiesAttributeDescriptor, NormalizesPropertyValue
 {
     const NAME = 'resolver';
     const RESOLVER_METHOD_PATTERN = '/\\bpublic\\s+static\\s+\\w+\\s+(resolve([\\w_]+)(?:Attribute|Attributes))\\b/ui';
@@ -50,12 +54,30 @@ class Resolver implements AttributePropertyType, ModifiesAttributeDescriptor
 
     public function modifyDescriptor(array $config, array $normalizedProperties): ?array
     {
+        $newProps = [];
         if (!isset($normalizedProperties['map']['to']) || $normalizedProperties['map']['to'] === true) {
-            if ($config['resolver'] instanceof AttributeResolver) {
-                return ['map.to' => false];
+            $resolver = $config['resolver'];
+            if ($resolver instanceof AttributeResolver) {
+                $newProps['map.to'] = false;
+            }
+            if ($resolver instanceof AssociationResolver) {
+                $newProps['transform.type'] = 'object';
+                try {
+                    $varType = qualify_var_type(DataTypeManager::resolve()
+                        ->getDescriptor($resolver->getAssociatedDataType())
+                        ->getObjectClass());
+                } catch (Throwable $throwable) {
+                    $varType = qualify_var_type($resolver->getAssociatedDataType());
+                }
+
+                if (!$resolver->isSingular()) {
+                    $varType .= '[]';
+                    $newProps['transform.type'] = 'objectCollection';
+                }
+                $newProps['varType'] = $varType;
             }
         }
-        return null;
+        return $newProps;
     }
 
     /**
