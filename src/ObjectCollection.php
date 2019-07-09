@@ -41,27 +41,37 @@ abstract class ObjectCollection extends Collection implements Responsable, Colle
 
     /**
      * @param string $dataTypeName
-     * @return \Sayla\Objects\ObjectCollection
+     * @return \Sayla\Objects\ObjectCollection|string
      */
-    public static function makeFor(string $dataTypeName)
+    private static function makeDynamicCollection(string $dataTypeName): string
     {
-        if (!isset(self::$collectionClasses[$dataTypeName])) {
-            $collection = new class() extends ObjectCollection
+        $collection = null;
+        $className = str_replace('\\', '_', __NAMESPACE__) . '_Collections_' . str_replace('\\', '', $dataTypeName);
+        eval(sprintf('class %s extends %s
             {
-                public $dataTypeName;
+                const DATA_TYPE_NAME = "%s";
 
                 /**
                  * @return string
                  */
                 public function getDataTypeName(): string
                 {
-                    return $this->dataTypeName;
+                    return self::DATA_TYPE_NAME;
                 }
-            };
-            $collection->dataTypeName = $dataTypeName;
-            self::$collectionClasses[$dataTypeName] = $collection;
+            };', $className, self::class, $dataTypeName));
+        return $className;
+    }
+
+    /**
+     * @param string $dataTypeName
+     * @return \Sayla\Objects\ObjectCollection
+     */
+    public static function makeFor(string $dataTypeName)
+    {
+        if (!isset(self::$collectionClasses[$dataTypeName])) {
+            self::$collectionClasses[$dataTypeName] = self::makeDynamicCollection($dataTypeName);
         }
-        return clone self::$collectionClasses[$dataTypeName];
+        return new self::$collectionClasses[$dataTypeName];
     }
 
     /**
