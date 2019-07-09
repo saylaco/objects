@@ -17,6 +17,7 @@ class TableLookup implements Lookup
      * @var \Sayla\Objects\DataType\DataType
      */
     private $dataType;
+    private $findKeyCallback = null;
     /**
      * @var string
      */
@@ -48,9 +49,18 @@ class TableLookup implements Lookup
         return $this->dataType->hydrateMany($results);
     }
 
+    public function exists(string $key): bool
+    {
+        return $this->newQuery()->where($this->keyName, $key)->exists();
+    }
+
     public function find($key)
     {
-        return $this->findBy($this->keyName, $key);
+        $keyName = null;
+        if ($this->findKeyCallback) {
+            $keyName = call_user_func($this->findKeyCallback, $key);
+        }
+        return $this->findBy($keyName ?? $this->keyName, $key);
     }
 
     /**
@@ -73,10 +83,11 @@ class TableLookup implements Lookup
         return $result;
     }
 
-    public function exists(string $key): bool
+    public function getRow($key)
     {
-        return $this->newQuery()->where($this->keyName, $key)->exists();
+        return $this->newQuery()->where($this->keyName, $key)->first();
     }
+
     public function getWhere($attribute, $value)
     {
         $results = $this->newQuery()->where($attribute, $value)->get();
@@ -89,5 +100,11 @@ class TableLookup implements Lookup
     public function newQuery(): Builder
     {
         return $this->builder->newQuery()->from($this->tableName);
+    }
+
+    public function setFindKeyPicker(callable $callback)
+    {
+        $this->findKeyCallback = $callback;
+        return $this;
     }
 }

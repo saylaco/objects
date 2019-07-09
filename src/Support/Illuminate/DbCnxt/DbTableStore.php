@@ -11,7 +11,6 @@ use Sayla\Objects\Contract\DataObject\SupportsDataTypeManagerTrait;
 use Sayla\Objects\Contract\Stores\ConfigurableStore;
 use Sayla\Objects\Contract\Stores\ModifiesObjectBehavior;
 use Sayla\Objects\Contract\Stores\ObjectStore;
-use Symfony\Component\OptionsResolver\OptionsResolver;
 
 
 class DbTableStore implements ObjectStore, ConfigurableStore, ModifiesObjectBehavior, SupportsDataTypeManager
@@ -25,22 +24,30 @@ class DbTableStore implements ObjectStore, ConfigurableStore, ModifiesObjectBeha
     /** @var \Sayla\Objects\DataType\DataType */
     protected $dataType;
     /** @var string */
+    protected $keyColumn;
+    /** @var string */
     protected $keyName;
+    protected $retrieveKeyAfterCreate = false;
+    protected $retrieveRow = false;
     /**
      * @var \Illuminate\Database\Query\Builder
      */
     protected $table;
     /** @var string */
     protected $tableName;
-    protected $useTransactions = false;
+    /** @var bool */
+    protected $useTransactions;
 
-    public static function defineOptions(OptionsResolver $resolver): void
     public static function defineOptions($resolver): void
     {
         $resolver->setRequired('table');
         $resolver->setAllowedTypes('table', 'string');
         $resolver->setDefault('key', 'id');
         $resolver->setAllowedTypes('key', ['string']);
+        $resolver->setDefault('retrieveKey', false);
+        $resolver->setAllowedTypes('retrieveKey', ['boolean']);
+        $resolver->setDefault('retrieveRow', false);
+        $resolver->setAllowedTypes('retrieveRow', ['boolean']);
         $resolver->setDefault('useTransactions', false);
         $resolver->setAllowedTypes('useTransactions', 'boolean');
         $resolver->setDefault('connection', null);
@@ -63,7 +70,7 @@ class DbTableStore implements ObjectStore, ConfigurableStore, ModifiesObjectBeha
     public function create(StorableObject $object): iterable
     {
         if ($this->useTransactions) {
-            return $this->newQuery()->getConnection()->transaction(function () use ($object) {
+            return $this->table->getConnection()->transaction(function () use ($object) {
                 return $this->createRow($object);
             });
         }
@@ -73,17 +80,30 @@ class DbTableStore implements ObjectStore, ConfigurableStore, ModifiesObjectBeha
     protected function createRow(StorableObject $object)
     {
         $data = $this->dataType->extract($object);
-        $id = $this->newQuery()->insertGetId($data);
-        if ($id > 0) {
-            return [$this->keyName => $id];
+        $newData = [];
+        if ($this->retrieveKeyAfterCreate) {
+            $newData[$this->keyName] = $this->table->insertGetId($data);
+        } else {
+            $this->table->insert($data);
         }
-        return [];
+        if ($this->retrieveRow) {
+            $key = $newData[$this->keyName] ?? $data[$this->keyColumn] ?? $this->newQuery()
+                    ->orderByDesc($this->keyColumn)
+                    ->where($data)
+                    ->pluck($this->keyColumn);
+            if ($key) {
+                $row = $this->lookup()->getRow($key);
+                foreach ($row as $k => $v)
+                    $newData[$k] = $v;
+            }
+        }
+        return $newData;
     }
 
     public function delete(StorableObject $object): iterable
     {
         if ($this->useTransactions) {
-            return $this->newQuery()->getConnection()->transaction(function () use ($object) {
+            return $this->table->getConnection()->transaction(function () use ($object) {
                 return $this->deleteRow($object);
             });
         }
@@ -92,7 +112,7 @@ class DbTableStore implements ObjectStore, ConfigurableStore, ModifiesObjectBeha
 
     protected function deleteRow($object)
     {
-        $this->newQuery()->delete($object->getKey());
+        $this->newQuery()->where($this->keyColumn, $object->getKey())->delete();
         return [];
     }
 
@@ -128,8 +148,11 @@ class DbTableStore implements ObjectStore, ConfigurableStore, ModifiesObjectBeha
         $this->keyName = $options['key'];
         $this->useTransactions = $options['useTransactions'];
         $this->tableName = $options['table'];
+        $this->retrieveKeyAfterCreate = $options['retrieveKey'];
+        $this->retrieveRow = $options['retrieveRow'];
         $this->table = DB::connection($options['connection'])->table($options['table']);
         $this->dataType = self::getDataTypeManager()->get($name);
+        $this->keyColumn = $this->dataType->getDescriptor()->getAttributeMapping($options['key'])['to'];
     }
 
     /**
@@ -157,13 +180,20 @@ class DbTableStore implements ObjectStore, ConfigurableStore, ModifiesObjectBeha
         return $this->updateRow($object);
     }
 
-    protected function updateRow($object)
+    protected function updateRow(StorableObject $object)
     {
         $data = $this->dataType->extract($object);
+
         $this->newQuery()
-            ->where($this->keyName, $object->getKey())
+            ->where($this->keyColumn, $object->getKey())
             ->update($data);
-        return [];
+        $newData = [];
+        if ($this->retrieveRow) {
+            $row = $this->lookup()->getRow($object[$this->keyName]);
+            foreach ($row as $k => $v)
+                $newData[$k] = $v;
+        }
+        return $newData;
     }
 
     /**

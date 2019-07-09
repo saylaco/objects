@@ -4,6 +4,7 @@ namespace Sayla\Objects\Support\Illuminate;
 
 use Faker\Generator as FakerGenerator;
 use Illuminate\Contracts\Container\Container;
+use Illuminate\Database\Schema\Blueprint;
 use Sayla\Objects\ObjectsBindings;
 use Sayla\Objects\Stubs\StubFactory;
 use Sayla\Objects\Support\Illuminate\DbCnxt\DbTableStore;
@@ -16,6 +17,10 @@ class LaravelObjectsBindings extends ObjectsBindings implements RunsOnBoot
 
     public function booting($container, $aliases): void
     {
+        Blueprint::macro('stamps', function ($precision = 0) {
+            $this->timestamp('created_at', $precision)->useCurrent();
+            $this->timestamp('updated_at', $precision)->useCurrent();
+        });
         $bootstrapper = new Bootstrapper($container, $aliases['dataTypeManager']);
 
         if ($this->option('bootDispatcher')) {
