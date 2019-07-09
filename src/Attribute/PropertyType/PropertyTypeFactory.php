@@ -6,11 +6,15 @@ use Sayla\Data\DotArray;
 use Sayla\Exception\Error;
 use Sayla\Objects\Attribute\Property;
 use Sayla\Objects\Contract\PropertyTypes\AttributePropertyType;
+use Sayla\Objects\Contract\PropertyTypes\DefinesOptions;
 use Sayla\Objects\Contract\PropertyTypes\ModifiesAttributeDescriptor;
 use Sayla\Objects\Contract\PropertyTypes\NormalizesPropertyValue;
+use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class PropertyTypeFactory
 {
+    protected static $optionsResolver = [];
+
     /**
      * @param \ReflectionClass $objectClass
      * @param string $attributeName
@@ -20,13 +24,13 @@ class PropertyTypeFactory
      * @throws \Sayla\Exception\Error
      */
     public function getProperties(string $objectClass, ?string $classFile, string $attributeName, string $attributeType,
-                                  array $descriptorData): array
+                                  array $descriptorData, array $propertyTypeOptions): array
     {
 
         /** @var AttributePropertyType[] $propertyTypes */
         $propertyTypes = array_merge(
             $this->getAutoPropertyTypes($objectClass),
-            $this->getPropertyTypes(array_keys($descriptorData))
+            $this->getPropertyTypes(array_keys($descriptorData), $propertyTypeOptions)
         );
         if (isset($propertyTypes['type'])) {
             // make sure type is first property type
@@ -123,11 +127,18 @@ class PropertyTypeFactory
      * @return AttributePropertyType[]
      * @throws \Sayla\Exception\Error
      */
-    public function getPropertyTypes(array $propertyTypeNames): array
+    public function getPropertyTypes(array $propertyTypeNames, array $propertyTypeOptions): array
     {
+        $optionsByType = collect($propertyTypeOptions)->pluck('options', 'propertyType');
+        $uniquePropertyTypeNames = array_unique(array_merge($propertyTypeNames, $optionsByType->keys()->all()));
         $properties = [];
-        foreach ($propertyTypeNames as $key) {
+        foreach ($uniquePropertyTypeNames as $key) {
             $propertyType = $this->getPropertyType($key);
+            $options = $optionsByType[$key] ?? [];
+            if (filled($options) && $propertyType instanceof DefinesOptions) {
+                $optionsResolver = $this->getPropertyTypeOptionsResolver(get_class($propertyType));
+                $propertyType->setOptions($optionsResolver->resolve($options));
+            }
             $properties[$propertyType->getName()] = $propertyType;
         }
         return $properties;
@@ -174,5 +185,19 @@ class PropertyTypeFactory
         }
 
         return $propertyTypes;
+    }
+
+    /**
+     * @param string|DefinesOptions $class
+     * @return \Symfony\Component\OptionsResolver\OptionsResolver
+     */
+    private function getPropertyTypeOptionsResolver(string $class): OptionsResolver
+    {
+        if (!isset(self::$optionsResolver[$class])) {
+            $optionsResolver = new OptionsResolver();
+            $class::defineOptions($optionsResolver);
+            self::$optionsResolver[$class] = $optionsResolver;
+        }
+        return self::$optionsResolver[$class];
     }
 }

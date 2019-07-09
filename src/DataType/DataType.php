@@ -86,7 +86,11 @@ final class DataType
      */
     public static function makeAttributeFactory(array $options): AttributeFactory
     {
-        return new AttributeFactory($options['objectClass'], $options['attributes'], $options['classFile']);
+        $atFact = new AttributeFactory($options['objectClass'], $options['attributes'], $options['classFile']);
+        if ($options['propertyTypeOptions']) {
+            $atFact->setPropertyTypeOptions($options['propertyTypeOptions']);
+        }
+        return $atFact;
     }
 
     public static function makeDescriptor(AttributeFactory $attributeFactory, string $name): DataTypeDescriptor

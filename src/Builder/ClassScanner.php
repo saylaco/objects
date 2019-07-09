@@ -9,6 +9,7 @@ use Sayla\Objects\Annotation\AnnoEntry;
 use Sayla\Objects\Annotation\AnnotationReader;
 use Sayla\Objects\Annotation\ClassAnnotation;
 use Sayla\Objects\Annotation\DataTypeEntry;
+use Sayla\Objects\Annotation\PropertyTypeOptionsAnno;
 use Sayla\Objects\Attribute\AttributeResolverFactory;
 use Sayla\Objects\Attribute\PropertyType\Type;
 use Sayla\Objects\Contract\Attributes\AssociationResolver;
@@ -26,20 +27,22 @@ class ClassScanner
         $this->annotationCacheDir = $annotationCacheDir;
     }
 
-    public function __invoke(DataTypeConfig $builder)
+    public function __invoke(DataTypeConfig $dataTypeConfig)
     {
-        $reflectionClass = new ReflectionClass($builder->getObjectClass());
-        $attributes = array_merge(
-            $this->getInheritedAttributes($reflectionClass),
-            $this->getClassAttributes($reflectionClass, function (DataTypeEntry $annotation) use ($builder) {
+        $reflectionClass = new ReflectionClass($dataTypeConfig->getObjectClass());
+
+        $propertyTypeOptions = [];
+        $attributes = [];
+        $this->mergeResults($attributes, $propertyTypeOptions, $this->getInheritedAttributes($reflectionClass));
+        $this->mergeResults($attributes, $propertyTypeOptions,
+            $this->getClassAttributes($reflectionClass, function (DataTypeEntry $annotation) use ($dataTypeConfig) {
                 if ($annotation->hasStore()) {
-                    $builder->store($annotation->getStoreDriver(), $annotation->getStoreOptions());
+                    $dataTypeConfig->store($annotation->getStoreDriver(), $annotation->getStoreOptions());
                 }
             }));
-
-        $builder->attributes($attributes);
-
-        return $builder;
+        $dataTypeConfig->attributes($attributes);
+        $dataTypeConfig->propertyTypeOptions($propertyTypeOptions);
+        return $dataTypeConfig;
     }
 
     /**
@@ -75,6 +78,7 @@ class ClassScanner
         $reader = new AnnotationReader($reflectionClass);
         $reader->addResolver('datatype', DataTypeEntry::class);
         $reader->addResolver('alias', AliasEntry::class);
+        $reader->addResolver('map', PropertyTypeOptionsAnno::class);
 
         $annotations = $reader->getResult();
 
@@ -83,14 +87,19 @@ class ClassScanner
                 $annotation->process($reflectionClass);
             }
         }
-
+        $propertyTypeOptions = [];
         foreach ($annotations as $i => $annotation) {
             if ($annotation instanceof DataTypeEntry) {
                 if ($onDataTypeEntry) {
                     $onDataTypeEntry($annotation);
                 }
                 unset($annotations[$i]);
-                break;
+            } elseif ($annotation instanceof PropertyTypeOptionsAnno) {
+                $propertyTypeOptions[] = [
+                    'propertyType' => $annotation->getName(),
+                    'options' => $annotation->getProperties(),
+                ];
+                unset($annotations[$i]);
             }
         }
         $attributes = [];
@@ -117,7 +126,7 @@ class ClassScanner
                 }
             }
         }
-        return $attributes;
+        return compact('attributes', 'propertyTypeOptions');
     }
 
     /**
@@ -128,16 +137,25 @@ class ClassScanner
      */
     private function getInheritedAttributes(ReflectionClass $reflectionClass): array
     {
+        $propertyTypeOptions = [];
         $attributes = [];
         $parentClass = $reflectionClass->getParentClass();
         while ($parentClass
             && $parentClass->implementsInterface(IDataObject::class)
             && $parentClass->getName() !== DataObject::class
         ) {
-            $attributes = array_merge($attributes, $this->getClassAttributes($parentClass));
+            $result = $this->getClassAttributes($parentClass);
+            $this->mergeResults($attributes, $propertyTypeOptions, $result);
             $parentClass = $parentClass->getParentClass();
         }
-        return $attributes;
+        return compact('attributes', 'propertyTypeOptions');
+    }
+
+
+    private function mergeResults(array &$attributes, array &$propertyTypeOptions, array $result)
+    {
+        $attributes = array_merge($attributes, $result['attributes']);
+        $propertyTypeOptions = array_merge($propertyTypeOptions, $result['propertyTypeOptions']);
     }
 
 }

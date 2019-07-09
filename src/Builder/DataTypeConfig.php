@@ -218,6 +218,12 @@ class DataTypeConfig
         return $this;
     }
 
+    public function propertyTypeOptions(array $options)
+    {
+        $this->options[__FUNCTION__] = $options;
+        return $this;
+    }
+
     public function runAddDataType(DataType $dataType)
     {
         foreach ($this->onAddDataTypeCallbacks as $callback)
@@ -257,9 +263,10 @@ class DataTypeConfig
     {
         if (!isset($this->optionsResolver)) {
             $resolver = new OptionsResolver();
-            $resolver->setRequired(['objectClass', 'attributes', 'resolveOnRequest']);
+            $resolver->setRequired(['objectClass', 'attributes', 'resolveOnRequest', 'propertyTypeOptions']);
 
             $resolver->setAllowedTypes('objectClass', 'string');
+            $resolver->setAllowedTypes('propertyTypeOptions', 'array');
             $resolver->setAllowedTypes('attributes', 'array');
             $resolver->setAllowedTypes('resolveOnRequest', 'array');
             $resolver->setDefault('resolveOnRequest', function (Options $options) {

@@ -30,6 +30,7 @@ class AttributeFactory
      * @var string
      */
     private $objectClass;
+    private $propertyTypeOptions = [];
     /** @var callable[][] */
     private $providers = [];
 
@@ -235,12 +236,14 @@ class AttributeFactory
                     $this->classFile,
                     $attr['attributeName'],
                     $attr['attributeType'],
-                    $attr['descriptorData']
+                    $attr['descriptorData'],
+                    $this->propertyTypeOptions
                 );
                 $descriptor = new Attribute($attr['attributeType'], $attr['attributeName'], $properties);
                 $normalizedDescriptors[$attr['attributeName']] = $descriptor;
             } catch (Throwable $e) {
-                throw new Error("Could not build definitions descriptor for \${$attributeName}", $e);
+                throw new Error("Could not build definitions descriptor for {$this->objectClass}.\${$attributeName}",
+                    $e);
             }
         }
         return $normalizedDescriptors;
@@ -283,5 +286,15 @@ class AttributeFactory
                 $dispatcher->on(Storable::ON_AFTER_UPDATE, $provider['provider']);
             });
         }
+    }
+
+    /**
+     * @param array $propertyTypeOptions
+     * @return AttributeFactory
+     */
+    public function setPropertyTypeOptions(array $propertyTypeOptions): AttributeFactory
+    {
+        $this->propertyTypeOptions = $propertyTypeOptions;
+        return $this;
     }
 }
