@@ -63,6 +63,11 @@ class JsonTransformer implements ValueTransformer, AttributeValueTransformer
         return 'string';
     }
 
+    public function getVarType(): string
+    {
+        return $this->options->get('itemClass', 'mixed') . '[]';
+    }
+
     /**
      * @param $value
      * @return mixed
@@ -92,10 +97,5 @@ class JsonTransformer implements ValueTransformer, AttributeValueTransformer
             $output = JsonHelper::encode($output ?: []);
         }
         return $output;
-    }
-
-    public function getVarType(): string
-    {
-        return 'mixed[]';
     }
 }

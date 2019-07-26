@@ -76,7 +76,7 @@ class ObjectCollectionTransformer implements AttributeValueTransformer, Supports
     public function smash($value)
     {
         if ($value instanceof ObjectCollection) {
-            return $value->toJson();
+            return $value->values()->toJson();
         }
         return JsonHelper::encode($value);
     }
