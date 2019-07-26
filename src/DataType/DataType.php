@@ -286,6 +286,11 @@ final class DataType
         return $object;
     }
 
+    public function isAttribute(string $name)
+    {
+        return $this->getAttributes()->isAttribute($name);
+    }
+
     /**
      * @return \Sayla\Objects\ObjectCollection
      */

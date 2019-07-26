@@ -153,6 +153,16 @@ class AttributeFactory
     }
 
     /**
+     * @param string $name
+     * @return bool
+     * @throws \Sayla\Exception\Error
+     */
+    public function isAttribute(string $name): bool
+    {
+        return isset($this->getAttributes()[$name]);
+    }
+
+    /**
      * @param callable|array $definition
      * @param $attributeName
      * @return array
