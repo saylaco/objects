@@ -54,6 +54,11 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
         return self::getDataTypeManager()->getDescriptor(static::dataTypeName());
     }
 
+    static public function getResponsableAttributes($request, $object)
+    {
+        return static::dataType()->getResponseFactory()->getObjectAttributes($request, $object);
+    }
+
     static public function makeCollectionResponse($request, $collection)
     {
         return static::dataType()->getResponseFactory()->makeCollectionResponse($request, $collection);
@@ -388,6 +393,15 @@ abstract class DataObject extends AttributableObject implements IDataObject, Sup
             throw new InaccessibleAttribute(static::dataTypeName(), $attributeName, 'Not writable');
         }
         $this->setAttributeValue($attributeName, $value);
+    }
+
+    /**
+     * @param \Illuminate\Http\Request $request
+     * @return \Sayla\Objects\Contract\Attributes\Attributable
+     */
+    public function toResponsable($request)
+    {
+        return self::getResponsableAttributes($request, $this);
     }
 
     /**

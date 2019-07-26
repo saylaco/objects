@@ -7,6 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Sayla\Objects\AttributableObject;
+use Sayla\Objects\Contract\Attributes\Attributable;
 use Sayla\Objects\Contract\DataType\ObjectResponseFactory as IObjectResponseFactory;
 use Sayla\Objects\Contract\IDataObject;
 use Sayla\Objects\DataObject;
@@ -34,6 +35,16 @@ class ObjectResponseFactory implements IObjectResponseFactory
 
     /**
      * @param \Illuminate\Http\Request $request
+     * @param \Sayla\Objects\Contract\IDataObject $object
+     * @return \Sayla\Objects\Contract\Attributes\Attributable
+     */
+    public function getObjectAttributes(Request $request, IDataObject $object): Attributable
+    {
+        return $this->resolveObjectAttributes($request, $object, $this->attributes);
+    }
+
+    /**
+     * @param \Illuminate\Http\Request $request
      * @param \Sayla\Objects\ObjectCollection $param
      * @return \Symfony\Component\HttpFoundation\Response
      */
@@ -41,7 +52,7 @@ class ObjectResponseFactory implements IObjectResponseFactory
     {
         $simpleCollection = collect();
         $collection->each(function ($object) use ($request, $simpleCollection) {
-            $simpleCollection[] = $this->resolveObjectAttributes($request, $object, $this->attributes);
+            $simpleCollection[] = $this->getObjectAttributes($request, $object);
         });
         return new JsonResponse($simpleCollection);
     }
@@ -53,7 +64,7 @@ class ObjectResponseFactory implements IObjectResponseFactory
      */
     public function makeObjectResponse(Request $request, IDataObject $object)
     {
-        return new JsonResponse($this->resolveObjectAttributes($request, $object, $this->attributes));
+        return new JsonResponse($this->getObjectAttributes($request, $object));
     }
 
     /**
