@@ -83,6 +83,14 @@ class TableLookup implements Lookup
         return $result;
     }
 
+    /**
+     * @return string
+     */
+    public function getKeyName(): string
+    {
+        return $this->keyName;
+    }
+
     public function getRow($key)
     {
         return $this->newQuery()->where($this->keyName, $key)->first();

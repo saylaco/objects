@@ -166,6 +166,11 @@ class DataTypeManager implements IteratorAggregate, Arrayable
         return $this->dataTypes[$name];
     }
 
+    public function getDataTypeNames()
+    {
+        return array_keys($this->dataTypes);
+    }
+
     public function getDescriptor(string $name): DataTypeDescriptor
     {
         return clone $this->get($name)->getDescriptor();
@@ -177,11 +182,6 @@ class DataTypeManager implements IteratorAggregate, Arrayable
     public function getIterator()
     {
         return new ArrayIterator($this->dataTypes);
-    }
-
-    public function getDataTypeNames()
-    {
-        return array_keys($this->dataTypes);
     }
 
     public function getObjectClass(string $name): string
@@ -196,9 +196,7 @@ class DataTypeManager implements IteratorAggregate, Arrayable
      */
     public function getObjectLookup(string $name): Lookup
     {
-        /** @var \Sayla\Objects\Contract\DataObject\Lookable $objectClass */
-        $objectClass = $this->get($name)->getDescriptor()->getObjectClass();
-        return $objectClass::lookup();
+        return $this->get($name)->getObjectLookup();
     }
 
     /**

@@ -42,7 +42,7 @@ class Resolver implements AttributePropertyType, ModifiesAttributeDescriptor, No
 
     public function getPropertyValue(string $attributeName, array $value, string $attributeType): ?array
     {
-        $config = ['resolver' => $value['value'] ?? null, 'autoResolve' => boolval($value['autoResolve'] ?? false)];
+        $config = ['resolver' => $value['value'] ?? null];
         if (isset($config['resolver'])) {
             $config['resolver'] = $this->normalizeResolver($config['resolver']);
         } else if ($config['resolver'] === null && isset($value['methods'][$attributeName])) {
@@ -55,26 +55,27 @@ class Resolver implements AttributePropertyType, ModifiesAttributeDescriptor, No
     public function modifyDescriptor(array $config, array $normalizedProperties): ?array
     {
         $newProps = [];
-        if (!isset($normalizedProperties['map']['to']) || $normalizedProperties['map']['to'] === true) {
-            $resolver = $config['resolver'];
-            if ($resolver instanceof AttributeResolver) {
-                $newProps['map.to'] = false;
+        $resolver = $config['resolver'];
+        if ($resolver instanceof AttributeResolver && !isset($normalizedProperties['map']['to'])) {
+            $newProps['map.to'] = false;
+        }
+        if ($resolver instanceof AssociationResolver) {
+            $newProps['transform.type'] = 'object';
+            try {
+                $varType = qualify_var_type(DataTypeManager::resolve()
+                    ->getDescriptor($resolver->getAssociatedDataType())
+                    ->getObjectClass());
+                $newProps['transform.dataType'] = $varType;
+            } catch (Throwable $throwable) {
+                $varType = qualify_var_type($resolver->getAssociatedDataType());
             }
-            if ($resolver instanceof AssociationResolver) {
-                $newProps['transform.type'] = 'object';
-                try {
-                    $varType = qualify_var_type(DataTypeManager::resolve()
-                        ->getDescriptor($resolver->getAssociatedDataType())
-                        ->getObjectClass());
-                } catch (Throwable $throwable) {
-                    $varType = qualify_var_type($resolver->getAssociatedDataType());
-                }
 
-                if (!$resolver->isSingular()) {
-                    $varType .= '[]';
-                    $newProps['transform.type'] = 'objectCollection';
-                }
-                $newProps['varType'] = $varType;
+            if (!$resolver->isSingular()) {
+                $varType .= '[]';
+                $newProps['transform.type'] = 'objectCollection';
+            }
+            if (empty($normalizedProperties['type']['value'])) {
+                $newProps['type.value'] = $varType;
             }
         }
         return $newProps;

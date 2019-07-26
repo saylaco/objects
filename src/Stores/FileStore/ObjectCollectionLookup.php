@@ -86,4 +86,12 @@ class ObjectCollectionLookup implements Lookup, SupportsDataTypeManager
     {
         return DataTypeManager::resolve()->get($this->dataType);
     }
+
+    /**
+     * @return string
+     */
+    public function getKeyName(): string
+    {
+        return $this->keyAttribute;
+    }
 }

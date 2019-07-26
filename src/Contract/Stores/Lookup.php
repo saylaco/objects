@@ -28,4 +28,8 @@ interface Lookup
      * @return \Sayla\Objects\ObjectCollection
      */
     public function getWhere($attribute, $value);
+    /**
+     * @return string
+     */
+    public function getKeyName(): string;
 }

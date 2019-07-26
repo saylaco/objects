@@ -5,9 +5,11 @@ namespace Sayla\Objects\DataType;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Support\Arrayable;
 use Sayla\Objects\Attribute\AttributeFactory;
+use Sayla\Objects\Contract\DataObject\Lookable;
 use Sayla\Objects\Contract\DataObject\StorableObjectTrait;
 use Sayla\Objects\Contract\DataType\ObjectResponseFactory as IObjectResponseFactory;
 use Sayla\Objects\Contract\Exception\HydrationError;
+use Sayla\Objects\Contract\Stores\Lookup;
 use Sayla\Objects\Contract\Stores\ObjectStore;
 use Sayla\Objects\DataObject;
 use Sayla\Objects\ObjectCollection;
@@ -172,6 +174,13 @@ final class DataType
         return $this->objectClass;
     }
 
+    public function getObjectLookup(): Lookup
+    {
+        /** @var \Sayla\Objects\Contract\DataObject\Lookable $objectClass */
+        $objectClass = $this->getObjectClass();
+        return $objectClass::lookup();
+    }
+
     public function getResponseFactory(): IObjectResponseFactory
     {
         if (!$this->responseFactory) {
@@ -321,6 +330,11 @@ final class DataType
     public function setStoreResolver(callable $storeResolver): void
     {
         $this->storeResolver = $storeResolver;
+    }
+
+    public function supportsLookup(): bool
+    {
+        return is_subclass_of($this->getObjectClass(), Lookable::class);
     }
 
     private function getExtractionPipeline(array $attributes = [])
