@@ -2,27 +2,18 @@
 
 namespace Sayla\Objects\Builder;
 
-use Illuminate\Support\Arr;
-use Illuminate\Support\Str;
 use Nette\PhpGenerator\ClassType;
 use Nette\PhpGenerator\PhpNamespace;
 use Nette\PhpGenerator\PsrPrinter;
 use ReflectionClass;
-use Sayla\Exception\Error;
 use Sayla\Objects\Attribute\PropertyType\TransformationDescriptorMixin;
-use Sayla\Objects\Contract\Attributes\AssociationResolver;
 use Sayla\Objects\Contract\DataObject\StorableObject;
 use Sayla\Objects\Contract\DataObject\StorableObjectTrait;
 use Sayla\Objects\Contract\IDataObject;
 use Sayla\Objects\Contract\Stores\ModifiesObjectBehavior;
 use Sayla\Objects\DataType\DataType;
 use Sayla\Objects\DataType\DataTypeDescriptor;
-use Sayla\Objects\DataType\DataTypeManager;
 use Sayla\Objects\Stores\StoreManager;
-use Sayla\Objects\Transformers\AttributeValueTransformer;
-use Sayla\Objects\Transformers\SmashesToHashMap;
-use Sayla\Objects\Transformers\SmashesToList;
-use Throwable;
 
 class ClassWriter
 {
@@ -66,8 +57,15 @@ class ClassWriter
     {
         /** @var \Sayla\Objects\Attribute\PropertyType\TransformationDescriptorMixin $transformerMixin */
         $descriptor = $dataType->getDescriptor();
-        foreach ($descriptor->getVarTypes() as $attributeName => $varTypes)
-            $class->addComment('@property ' . join('|', $varTypes) . ' ' . $attributeName);
+        foreach ($descriptor->getVarTypes() as $attributeName => $varTypes) {
+            if (!$descriptor->isWritable($attributeName) && $descriptor->isReadable($attributeName)) {
+                $class->addComment('@property-read ' . join('|', $varTypes) . ' ' . $attributeName);
+            } else if ($descriptor->isWritable($attributeName) && !$descriptor->isReadable($attributeName)) {
+                $class->addComment('@property-write ' . join('|', $varTypes) . ' ' . $attributeName);
+            } else {
+                $class->addComment('@property ' . join('|', $varTypes) . ' ' . $attributeName);
+            }
+        }
     }
 
     protected function createFile(ClassType ...$classes): void
