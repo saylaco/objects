@@ -14,6 +14,7 @@ use Sayla\Objects\Contract\IDataObject;
 use Sayla\Objects\DataType\DataType;
 use Sayla\Objects\DataType\DataTypeDescriptor;
 use Sayla\Objects\Support\ObjectCollectionProxy;
+use Throwable;
 
 /**
  * @method IDataObject[] getIterator
@@ -25,7 +26,7 @@ abstract class ObjectCollection extends Collection implements Responsable, Colle
     private static $collectionClasses = [];
     protected $allowNullItems = false;
     protected $keyAttribute;
-    protected $requireItemKey = false;
+    private $indexByKeyAttribute = false;
 
     /** @noinspection PhpMissingParentConstructorInspection */
     public function __construct($items = [])
@@ -34,7 +35,7 @@ abstract class ObjectCollection extends Collection implements Responsable, Colle
             if ($items instanceof Collection) {
                 $this->items = $items->items;
             } else {
-                $this->fill($items);
+                $this->putItems($items);
             }
         }
     }
@@ -45,11 +46,24 @@ abstract class ObjectCollection extends Collection implements Responsable, Colle
      */
     private static function makeDynamicCollection(string $dataTypeName): string
     {
-        $collection = null;
         $className = str_replace('\\', '_', __NAMESPACE__) . '_Collections_' . str_replace('\\', '', $dataTypeName);
+        $keyAttribute = null;
+        try {
+            $dt = self::getDataTypeManager()->get($dataTypeName);
+            if ($dt->supportsLookup()) {
+                $keyAttribute = $dt->getObjectLookup()->getKeyName();
+            } elseif ($dt->isAttribute('id')) {
+                $keyAttribute = 'id';
+            } elseif ($dt->isAttribute('key')) {
+                $keyAttribute = 'key';
+            }
+        } catch (Throwable $e) {
+
+        }
         eval(sprintf('class %s extends %s
             {
-                const DATA_TYPE_NAME = "%s";
+                const DATA_TYPE_NAME = "%s";    
+                protected $keyAttribute = %s;
 
                 /**
                  * @return string
@@ -58,7 +72,7 @@ abstract class ObjectCollection extends Collection implements Responsable, Colle
                 {
                     return self::DATA_TYPE_NAME;
                 }
-            };', $className, self::class, $dataTypeName));
+            };', $className, self::class, $dataTypeName, var_str($keyAttribute)));
         return $className;
     }
 
@@ -81,7 +95,7 @@ abstract class ObjectCollection extends Collection implements Responsable, Colle
     public static function makeUnrestrictedCollection($objects = null)
     {
         $static = (new static())->toUnrestrictedCollection();
-        return $objects ? $static->fill($objects) : $static;
+        return $objects ? $static->pushItems($objects) : $static;
     }
 
     /**
@@ -109,6 +123,12 @@ abstract class ObjectCollection extends Collection implements Responsable, Colle
         return new ObjectCollectionProxy($this, $key);
     }
 
+    public function alwaysIndexByKey(bool $flag = true)
+    {
+        $this->indexByKeyAttribute = $flag;
+        return $this;
+    }
+
     /**
      * @return \Sayla\Objects\DataType\DataType
      */
@@ -126,18 +146,6 @@ abstract class ObjectCollection extends Collection implements Responsable, Colle
     }
 
     /**
-     * @param $items
-     * @return $this
-     */
-    public function fill(iterable $items)
-    {
-        foreach ($items as $item) {
-            $this->push($item);
-        }
-        return $this;
-    }
-
-    /**
      * @return array
      */
     public function getArrayCopy(): array
@@ -150,6 +158,17 @@ abstract class ObjectCollection extends Collection implements Responsable, Colle
      */
     public abstract function getDataTypeName(): string;
 
+    /**
+     * @return \Illuminate\Support\Collection
+     */
+    public function getObjectKeys()
+    {
+        if ($this->keyAttribute) {
+            return $this->pluck($this->keyAttribute);
+        }
+        return $this->keys();
+    }
+
     public function groupBy($groupBy, $preserveKeys = false)
     {
         $results = $this->toBase()->groupBy($groupBy, $preserveKeys);
@@ -161,6 +180,11 @@ abstract class ObjectCollection extends Collection implements Responsable, Colle
             }
         }
         return $results;
+    }
+
+    public function index()
+    {
+        return $this->keyBy($this->keyAttribute);
     }
 
     /**
@@ -184,13 +208,9 @@ abstract class ObjectCollection extends Collection implements Responsable, Colle
         return parent::keys()->toBase();
     }
 
-    /**
-     * @param $items
-     * @return $this
-     */
     public function makeObjects($items)
     {
-        foreach ($items as $i => $item) {
+        foreach ($items as $item) {
             if (!$item instanceof IDataObject) {
                 if (filled($item)) {
                     $this->push($this->dataType()->hydrate($item));
@@ -200,6 +220,27 @@ abstract class ObjectCollection extends Collection implements Responsable, Colle
             }
         }
         return $this;
+    }
+
+    /**
+     * Run a map over each of the items.
+     *
+     * @param callable $callback
+     * @return static
+     */
+    public function map(callable $callback)
+    {
+        $keys = array_keys($this->items);
+
+        $items = array_map($callback, $this->items, $keys);
+
+        $first = head($items);
+
+        if (!$first instanceof IDataObject) {
+            return collect(array_combine($keys, $items));
+        }
+
+        return new static(array_combine($keys, $items));
     }
 
     /**
@@ -224,7 +265,7 @@ abstract class ObjectCollection extends Collection implements Responsable, Colle
     {
         $this->validateItemType($value);
 
-        if (is_null($key) && $this->isForcingKeys()) {
+        if (is_null($key) && $this->indexByKeyAttribute && $this->isForcingKeys()) {
             $key = $value->{$this->keyAttribute};
         }
 
@@ -239,7 +280,31 @@ abstract class ObjectCollection extends Collection implements Responsable, Colle
 
     public function pluck($value, $key = null)
     {
-        return parent::pluck($value, $key)->toBase();
+        return $this->toBase()->pluck($value, $key);
+    }
+
+    /**
+     * @param $items
+     * @return $this
+     */
+    public function pushItems(iterable $items)
+    {
+        foreach ($items as $i => $item) {
+            $this->push($item);
+        }
+        return $this;
+    }
+
+    /**
+     * @param $items
+     * @return $this
+     */
+    public function putItems(iterable $items)
+    {
+        foreach ($items as $i => $item) {
+            $this->put($i, $item);
+        }
+        return $this;
     }
 
     /**
@@ -284,8 +349,7 @@ abstract class ObjectCollection extends Collection implements Responsable, Colle
         $static = clone $this;
         $static->items = [];
         $static->allowNullItems = true;
-        $static->requireItemKey = false;
-        return $static->fill($this->items);
+        return $static->pushItems($this->items);
     }
 
     /**
@@ -297,12 +361,12 @@ abstract class ObjectCollection extends Collection implements Responsable, Colle
         $static = clone $this;
         $static->items = [];
         $static->keyAttribute = $keyAttribute;
-        return $static->fill($this->items);
+        return $static->putItems($this->items);
     }
 
     protected function validateItemKey($key)
     {
-        if ($this->requireItemKey && $key === null) {
+        if ($this->indexByKeyAttribute && $key === null) {
             throw new InvalidValue('An item must have a non null key');
         }
     }
