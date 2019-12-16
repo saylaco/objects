@@ -50,7 +50,7 @@ class Bootstrapper
         OwnedDescriptorMixin::setDefaultUserAttributeCallback(function (string $attributeName) use ($guard, $auth) {
             $guard = $auth->guard($guard);
             $authenticatable = $guard->user();
-            return $authenticatable->{$attributeName};
+            return isset($authenticatable) ? $authenticatable->{$attributeName} : null;
         });
     }
 
@@ -62,8 +62,7 @@ class Bootstrapper
         $validator->extend('objExists', function ($attribute, $value, $args) {
             /** @var \Sayla\Objects\Stores\StoreManager $store */
             return filled($value) ? $this->getDataTypeManager()
-                ->get($args[0])->getStoreStrategy()
-                ->exists($value) : false;
+                ->get($args[0])->getObjectLookup()->exists($value) : false;
         }, 'Object not found.');
 
         ValidationBuilder::setSharedValidationFactory($validator);

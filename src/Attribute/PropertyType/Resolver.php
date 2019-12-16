@@ -43,11 +43,25 @@ class Resolver implements AttributePropertyType, ModifiesAttributeDescriptor, No
     public function getPropertyValue(string $attributeName, array $value, string $attributeType): ?array
     {
         $config = ['resolver' => $value['value'] ?? null];
+        $attributeResolver = null;
         if (isset($config['resolver'])) {
-            $config['resolver'] = $this->normalizeResolver($config['resolver']);
+            $attributeResolver = $this->normalizeResolver($config['resolver']);
+            $config['resolver'] = $attributeResolver;
         } else if ($config['resolver'] === null && isset($value['methods'][$attributeName])) {
-            $config['resolver'] = $this->getResolverFromObjectClass($value['objectClass'],
-                $value['methods'][$attributeName], $attributeName);
+            $attributeResolver = $this->getResolverFromObjectClass(
+                $value['objectClass'],
+                $value['methods'][$attributeName],
+                $attributeName
+            );
+            $config['resolver'] = $attributeResolver;
+        }
+        if (!!$attributeResolver) {
+            try {
+                $attributeResolver->getAttribute();
+            } catch (Throwable $e) {
+                $attributeResolver->setOwnerAttributeName($attributeName);
+                $attributeResolver->setOwnerObjectClass($value['objectClass']);
+            }
         }
         return isset($config['resolver']) ? $config : null;
     }

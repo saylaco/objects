@@ -2,11 +2,16 @@
 
 namespace Sayla\Objects\Contract\DataObject;
 
+use Sayla\Objects\Contract\Stores\Lookup;
+
 /**
  * Trait LooksUpDataTrait
+ * @method static prepareLookup($lookup)
  */
 trait LookableTrait
 {
+    private static $preparers = [];
+
     /**
      * @return static[]|\Sayla\Objects\ObjectCollection
      */
@@ -31,6 +36,11 @@ trait LookableTrait
         return static::lookup()->findBy($attribute, $value);
     }
 
+    protected static function getLookupInstance(): Lookup
+    {
+        return static::getStore()->lookup();
+    }
+
     /**
      * @return static
      */
@@ -40,7 +50,32 @@ trait LookableTrait
     }
 
     /**
-     * @return \Sayla\Objects\Contract\DataObject\Lookable
+     * @return \Sayla\Objects\Contract\Stores\Lookup
      */
-    public abstract static function lookup();
+    public static function lookup()
+    {
+        $lookup = static::getLookupInstance();
+        $shouldPrepare = self::$preparers[static::class]
+            ?? self::$preparers[static::class] = method_exists(static::class, 'prepareLookup');
+        return $shouldPrepare ? static::prepareLookup($lookup) : $lookup;
+    }
+
+
+    protected function determineExistence(): bool
+    {
+        return filled($this->getKey());
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getKey()
+    {
+        return $this->getAttributeValue(static::lookup()->getKeyName());
+    }
+
+    public function setKey($value)
+    {
+         $this->setAttributeValue(static::lookup()->getKeyName(), $value);
+    }
 }

@@ -39,6 +39,9 @@ class ClassScanner
                 if ($annotation->hasStore()) {
                     $dataTypeConfig->store($annotation->getStoreDriver(), $annotation->getStoreOptions());
                 }
+                if ($extends = $annotation->getExtends()) {
+                    $dataTypeConfig->extends($extends);
+                }
             }));
         $dataTypeConfig->attributes($attributes);
         $dataTypeConfig->propertyTypeOptions($propertyTypeOptions);

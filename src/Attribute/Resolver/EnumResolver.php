@@ -2,7 +2,6 @@
 
 namespace Sayla\Objects\Attribute\Resolver;
 
-use BenSampo\Enum\Enum;
 use Sayla\Objects\Contract\Attributes\AttributeResolver;
 use Sayla\Objects\Contract\Attributes\AttributeResolverTrait;
 use Sayla\Objects\Contract\Attributes\SupportsCallableResolverTrait;
@@ -12,23 +11,30 @@ class EnumResolver implements AttributeResolver
 {
     use SupportsCallableResolverTrait;
     use AttributeResolverTrait;
+    /**
+     * @var \BenSampo\Enum\Enum
+     */
+    public $enumClass;
 
     /**
      * EnumResolver constructor.
      * @param \BenSampo\Enum\Enum $enumClass
      */
-    public function __construct($enumClass)
+    public function __construct($enumClass, $valueAttributeName = null)
     {
-        $this->setCallable(function (IDataObject $object) use ($enumClass): ?Enum {
-            $value = $object[$this->getAttribute()];
-            return $value === null ? null : $enumClass::getInstance($value);
-        });
+        $this->enumClass = $enumClass;
+        $this->setOwnerAttributeName($valueAttributeName ?? lcfirst(class_basename($enumClass)) . 'Name');
     }
 
 
-    public function resolve(IDataObject $owningObject)
+    public function resolve(IDataObject $object)
     {
-        return $this->runCallable($owningObject);
+        $value = $object[$this->getAttribute()];
+        if ($value === null) {
+            return null;
+        }
+        $enumClass = $this->enumClass;
+        return $enumClass::getInstance($value);
     }
 
     public function resolveMany($objects): array

@@ -30,12 +30,13 @@ final class DataType
     /**
      * @var string
      */
-    protected $name;
+    protected $name, $alias;
     /**
      * @var string
      */
     protected $objectClass;
     protected $storeOptions;
+    private $definitionFile;
     private $descriptor;
     private $extractionPipeline;
     private $hydrationPipeline;
@@ -53,6 +54,8 @@ final class DataType
     {
         $this->objectClass = $options['objectClass'];
         $this->name = $options['name'];
+        $this->alias = $options['alias'];
+        $this->definitionFile = $options['definitionFile'] ?? null;
         $this->storeOptions = $options['store'] ?? null;
         $this->traits = $options['traits'];
         $this->interfaces = $options['interfaces'];
@@ -125,6 +128,14 @@ final class DataType
     }
 
     /**
+     * @return string
+     */
+    public function getAlias(): string
+    {
+        return $this->alias;
+    }
+
+    /**
      * @return AttributeFactory
      */
     public function getAttributes(): AttributeFactory
@@ -138,6 +149,11 @@ final class DataType
     public function getBaseObjectClass(): string
     {
         return $this->baseObjectClass ?? ($this->storeOptions ? StorableObjectTrait::class : DataObject::class);
+    }
+
+    public function getDefinitionFile(): string
+    {
+        return $this->definitionFile ?? self::$definitionDirectory . '/' . $this->getAlias() . 'DT.php';
     }
 
     /**

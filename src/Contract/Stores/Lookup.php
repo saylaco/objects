@@ -9,6 +9,8 @@ interface Lookup
      */
     public function all();
 
+    public function exists(string $key): bool;
+
     /**
      * @param $key
      * @return \Sayla\Objects\Contract\IDataObject
@@ -23,13 +25,14 @@ interface Lookup
     public function findBy($attribute, $value);
 
     /**
+     * @return string
+     */
+    public function getKeyName(): string;
+
+    /**
      * @param $attribute
      * @param $key
      * @return \Sayla\Objects\ObjectCollection
      */
     public function getWhere($attribute, $value);
-    /**
-     * @return string
-     */
-    public function getKeyName(): string;
 }

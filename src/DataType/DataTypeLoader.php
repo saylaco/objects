@@ -2,6 +2,7 @@
 
 namespace Sayla\Objects\DataType;
 
+use Illuminate\Support\Str;
 use Sayla\Objects\Builder\DataTypeConfig;
 use Symfony\Component\Yaml\Yaml;
 
@@ -31,14 +32,45 @@ class DataTypeLoader
         return $this;
     }
 
+    protected function addDataTypeConfig(DataTypeManager $manager, array $object): DataTypeConfig
+    {
+        $configType = $object['configType'];
+        $object = $this->runCallbacks($configType, $object);
+        $cachedConfig = array_only($object, ['definitionFile', 'alias', 'name']);
+        switch ($configType) {
+            case self::CONFIG_ARRAY:
+                $cachedConfig = array_merge($cachedConfig, $object['config'], [
+                    'objectClass' => $object['class'],
+                    'name' => $object['config']['name'] ?? $object['class']
+                ]);
+                return $manager->addConfigured($cachedConfig)->enableOptionsValidation();
+            case self::CONFIG_ANNOTATIONS:
+            default:
+                return $manager->addClass($object['class'], $object['file'], $cachedConfig);
+        }
+    }
+
     /**
      * @param string $directory
      * @param string $namespace
      * @return $this
      */
-    public function addLocation(string $directory, string $namespace)
+    public function addLocation(string $directory, string $namespace, string $definitionsDir,
+                                string $aliasPrefix = null)
     {
-        $this->locations[] = compact('directory', 'namespace');
+        $addChildren = Str::endsWith($directory, '*');
+        if ($addChildren) {
+            $directory = rtrim($directory, '/*');
+        }
+        $this->locations[] = compact('directory', 'namespace', 'definitionsDir', 'aliasPrefix');
+
+        if ($addChildren) {
+            foreach ($this->getChildLocations($directory, $namespace) as $details) {
+                $details['rootNamespace'] = $namespace;
+                $details['definitionsDir'] = $definitionsDir;
+                $this->locations[] = $details;
+            }
+        }
         return $this;
     }
 
@@ -46,26 +78,26 @@ class DataTypeLoader
      * @param \Sayla\Objects\DataType\DataTypeManager $manager
      * @return DataTypeConfig[]
      */
-    public function build(DataTypeManager $manager)
+    public function configure(DataTypeManager $manager)
     {
         if (filled($this->locations)) {
             $this->discoverObjects();
         }
-        $builders = [];
+        $configs = [];
         foreach ($this->objects as $object) {
-            $builders[] = $this->makeBuilder($manager, $object);
+            $configs[] = $this->addDataTypeConfig($manager, $object);
         }
-        return $builders;
+        return $configs;
     }
 
     /**
      * @param string $directory
      * @param string $namespace
      */
-    protected function discoverAnnotatedTypes(string $directory, string $namespace): void
+    protected function discoverAnnotatedTypes(array $location): void
     {
         $configType = self::CONFIG_ANNOTATIONS;
-        foreach (glob($directory . '/*.php') as $file) {
+        foreach (glob($location['directory'] . '/*.php') as $file) {
             $reader = fopen($file, 'r');
             $isDataType = false;
             $docBlockLines = [];
@@ -91,59 +123,77 @@ class DataTypeLoader
             fclose($reader);
             if (!$isDataType) continue;
             $name = str_before(basename($file), '.');
-            $class = str_finish($namespace, '\\') . $name;
-            $this->objects[] = $obj = compact('class', 'file', 'configType');
-            $this->runDiscoverCallback($obj);
+            $class = str_finish($location['namespace'], '\\') . $name;
+            $this->objects[] = $this->runDiscoverCallback(
+                $location, $name, compact('class', 'file', 'configType', 'definitionFile')
+            );
         }
     }
 
-    /**
-     * @param string $directory
-     * @param string $namespace
-     * @return array
-     */
+
     public function discoverObjects()
     {
         foreach ($this->locations as $i => $location) {
-            $this->discoverYamlTypes($location['directory'], $location['namespace']);
-            $this->discoverAnnotatedTypes($location['directory'], $location['namespace']);
+            $this->discoverYamlTypes($location);
+            $this->discoverAnnotatedTypes($location);
             unset($this->locations[$i]);
         }
         return $this->objects;
     }
 
-
-    /**
-     * @param string $directory
-     * @param string $namespace
-     */
-    protected function discoverYamlTypes(string $directory, string $namespace): void
+    protected function discoverYamlTypes(array $location): void
     {
         $configType = self::CONFIG_ARRAY;
-        foreach (glob($directory . '/*.yml') as $file) {
+        foreach (glob($location['directory'] . '/*.yml') as $file) {
             $name = str_before(basename($file), '.');
-            $class = str_finish($namespace, '\\') . $name;
+            $class = str_finish($location['namespace'], '\\') . $name;
             $config = Yaml::parseFile($file);
-            $this->objects[] = $obj = compact('class', 'file', 'configType', 'config');
-            $this->runDiscoverCallback($obj);
+            $this->objects[] = $this->runDiscoverCallback($location, $name, compact(
+                'class',
+                'file',
+                'configType',
+                'config',
+                'definitionFile'
+            ));
         }
     }
 
-
-    protected function makeBuilder(DataTypeManager $manager, array $object): DataTypeConfig
+    protected function getChildLocations(string $directory, string $namespace)
     {
-        $configType = $object['configType'];
-        $object = $this->runCallbacks($configType, $object);
-        switch ($configType) {
-            case self::CONFIG_ARRAY:
-                return $manager->addConfigured(array_merge($object['config'], [
-                    'objectClass' => $object['class'],
-                    'name' => $object['config']['name'] ?? $object['class']
-                ]))->enableOptionsValidation();
-            case self::CONFIG_ANNOTATIONS:
-            default:
-                return $manager->addClass($object['class'], $object['file']);
+        $locations = [];
+        foreach (glob($directory . '/*', GLOB_ONLYDIR) as $_directory) {
+            $_namespace = $namespace . '\\' . basename($_directory);
+            $locations[] = ['directory' => $_directory, 'namespace' => $_namespace];
+            $locations = array_merge($locations, $this->getChildLocations($_directory, $_namespace));
         }
+        return $locations;
+    }
+
+    /**
+     * @param array $location
+     * @param string $name
+     * @return string
+     */
+    protected function getDefinitionFile(array $location, string $name): string
+    {
+        if (isset($location['rootNamespace'])) {
+            $fullName = trim(Str::after($location['namespace'], $location['rootNamespace']), '\\') . $name;
+        } else {
+            $fullName = $name;
+        }
+        $definitionFile = $location['definitionsDir'] . '/' . Str::studly(str_replace('\\', '-', $fullName)) . 'DT.php';
+        return $definitionFile;
+    }
+
+    /**
+     * @return array[]
+     */
+    public function getDiscoveredObjects()
+    {
+        if (filled($this->locations)) {
+            $this->discoverObjects();
+        }
+        return $this->objects;
     }
 
     /**
@@ -167,11 +217,15 @@ class DataTypeLoader
         $this->onDiscover = $onDiscover;
     }
 
-    private function runDiscoverCallback(array $obj)
+    private function runDiscoverCallback(array $location, string $name, array $obj)
     {
+        $obj['name'] = $obj['class'];
+        $obj['definitionFile'] = $this->getDefinitionFile($location, $name);
+        $obj['alias'] = $location['aliasPrefix'] . $name;
         if ($this->onDiscover) {
             call_user_func($this->onDiscover, $obj);
         }
+        return $obj;
     }
 
 }

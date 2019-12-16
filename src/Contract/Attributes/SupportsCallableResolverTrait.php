@@ -3,6 +3,8 @@
 namespace Sayla\Objects\Contract\Attributes;
 
 use Closure;
+use Illuminate\Support\Str;
+use Sayla\Exception\InvalidArgument;
 use Sayla\Objects\DataObject;
 
 trait SupportsCallableResolverTrait
@@ -23,6 +25,11 @@ trait SupportsCallableResolverTrait
      */
     public function setCallable($callable)
     {
+        if (!is_callable($callable) &&
+            !(is_string($callable) && Str::contains($callable, '@'))
+        ) {
+            throw new InvalidArgument('Callable must be provided. ' . gettype($callable) . ' received.');
+        }
         $this->callable = $callable;
         $this->isClosure = $callable instanceof Closure;
         return $this;
@@ -38,6 +45,7 @@ trait SupportsCallableResolverTrait
             $closure = $this->callable->bindTo($owningObject);
             return $closure($owningObject);
         }
+
         return call_user_func($this->callable, $owningObject);
     }
 }

@@ -4,9 +4,9 @@ namespace Sayla\Objects\Contract;
 
 use Sayla\Objects\Builder\DataTypeConfig;
 
-interface RegistrarRepository
+interface DataTypeConfigCache
 {
-    public function addBuilder(DataTypeConfig $builder);
+    public function addConfig(DataTypeConfig $builder);
 
     public function flush();
 
@@ -15,6 +15,6 @@ interface RegistrarRepository
      *
      * @return array[]
      */
-    public function getAllOptions(): iterable;
+    public function getAllDataTypeConfigs(): iterable;
 
 }

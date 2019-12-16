@@ -113,12 +113,11 @@ class DataTypeDescriptor implements Serializable
         foreach (Arr::sort($transformer->getAttributeNames()) as $attributeName) {
             try {
                 $valueTransformer = $transformer->getValueTransformer($attributeName);
-                $_varTypes = array_map(
-                    'qualify_var_type',
-                    explode('|', $valueTransformer instanceof AttributeValueTransformer
+                $varType = $transformer->getAttributeOptions()[$attributeName]['varType'] ??
+                    ($valueTransformer instanceof AttributeValueTransformer
                         ? $valueTransformer->getVarType()
-                        : $valueTransformer->getScalarType() ?: 'mixed')
-                );
+                        : $valueTransformer->getScalarType() ?: 'mixed');
+                $_varTypes = array_map('qualify_var_type', explode('|', $varType));
                 if (!$valueTransformer instanceof AttributeValueTransformer
                     && ($valueTransformer instanceof SmashesToHashMap || $valueTransformer instanceof SmashesToList)) {
                     $isIterable = false;

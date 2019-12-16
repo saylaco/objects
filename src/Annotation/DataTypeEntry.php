@@ -30,6 +30,14 @@ class DataTypeEntry extends AnnoEntry implements ClassAnnotation
     /**
      * @return mixed[]
      */
+    public function getExtends(): ?string
+    {
+        return ltrim($this->properties['extends'] ?? null, '\\');
+    }
+
+    /**
+     * @return mixed[]
+     */
     public function getStoreOptions(): array
     {
         return $this->properties['store'] ?? [];

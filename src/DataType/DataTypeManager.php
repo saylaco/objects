@@ -7,13 +7,15 @@ use ArrayIterator;
 use Closure;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Support\Arrayable;
+use Illuminate\Support\Arr;
 use IteratorAggregate;
+use MJS\TopSort\Implementations\StringSort;
 use ReflectionClass;
-use Sayla\Exception\Error;
 use Sayla\Objects\Builder\ClassScanner;
 use Sayla\Objects\Builder\DataTypeConfig;
 use Sayla\Objects\Contract\DataObject\SupportsDataTypeManager;
-use Sayla\Objects\Contract\RegistrarRepository;
+use Sayla\Objects\Contract\DataTypeConfigCache;
+use Sayla\Objects\Contract\Exception\DataTypeException;
 use Sayla\Objects\Contract\Stores\Lookup;
 use Sayla\Objects\Stores\StoreManager;
 use Sayla\Objects\Transformers\Transformer\ObjectTransformer;
@@ -36,8 +38,13 @@ class DataTypeManager implements IteratorAggregate, Arrayable
     protected $configs = [];
     /** @var \Illuminate\Contracts\Events\Dispatcher */
     protected $dispatcher;
+    protected $eventDispatchingEnabled = true;
     /** @var bool */
     protected $registersProviders = true;
+    /**
+     * @var \MJS\TopSort\Implementations\StringSort
+     */
+    protected $sorter;
     /** @var \Sayla\Objects\Stores\StoreManager */
     protected $storeManager;
     /** @var callable[] */
@@ -45,13 +52,15 @@ class DataTypeManager implements IteratorAggregate, Arrayable
     private $aliases = [];
     /** @var \Sayla\Objects\Builder\ClassScanner */
     private $classScanner;
-    /** @var RegistrarRepository[] */
+    /** @var DataTypeConfigCache[] */
     private $configRepos = [];
     /** @var DataType[] */
     private $dataTypes = [];
 
     public function __construct(StoreManager $storeManager)
     {
+        $this->sorter = new StringSort();
+        $this->sorter->setThrowCircularDependency(false);
         $this->storeManager = $storeManager;
         $this->classScanner = new ClassScanner();
         if (!isset(self::$instance)) {
@@ -78,14 +87,9 @@ class DataTypeManager implements IteratorAggregate, Arrayable
         return $this;
     }
 
-    public function addBuilderRepo(RegistrarRepository $cache)
+    public function addClass(string $class, string $classFile = null, array $config = [])
     {
-        $this->configRepos[] = $cache;
-    }
-
-    public function addClass(string $class, string $classFile = null)
-    {
-        $config = $this->makeTypeConfig($class, compact('classFile'));
+        $config = $this->makeTypeConfig($class, ($config + compact('classFile')));
         if (!$this->alwaysScanClasses) {
             $config->beforeBuild($this->classScanner);
         }
@@ -94,28 +98,37 @@ class DataTypeManager implements IteratorAggregate, Arrayable
 
     protected function addConfig(DataTypeConfig $config)
     {
-        if ($this->dispatcher) {
+        if ($this->isDispatching()) {
             $this->dispatcher->dispatch(self::ON_CONFIG, [$config]);
             $this->dispatcher->dispatch(self::ON_CONFIG . ":{$config->getName()}", [$config]);
         }
-        if (!empty($config->getAlias()) && !isset($this->aliases[$config->getAlias()])) {
-            $this->aliases[$config->getAlias()] = $config->getName();
+
+        $alias = $config->getAlias();
+        if (!empty($alias) && !isset($this->aliases[$alias])) {
+            $this->aliases[$alias] = $config->getName();
         }
+
+        $extends = $config->getExtends();
+        $this->sorter->add($config->getName(), $extends ? Arr::wrap($this->getNameFromAlias($extends)) : []);
 
         if (!isset($this->aliases[$config->getObjectClass()])) {
             $this->aliases[$config->getObjectClass()] = $config->getName();
         }
+        if (!TransformerFactory::isSharedType($config->getName())) {
+            $this->addAttributeType($config->getName(), $config->getObjectClass());
+        }
+
         return $this->configs[] = $config;
     }
 
-    public function addConfigured(array $options)
+    public function addConfigured(array $cachedConfig)
     {
-        if (!isset($options['classFile'])) {
-            $options['classFile'] = class_exists($options['objectClass'])
-                ? self::classFilePath($options['objectClass'])
+        if (!isset($cachedConfig['classFile'])) {
+            $cachedConfig['classFile'] = class_exists($cachedConfig['objectClass'])
+                ? self::classFilePath($cachedConfig['objectClass'])
                 : null;
         }
-        $config = $this->makeTypeConfig($options['objectClass'], $options);
+        $config = $this->makeTypeConfig($cachedConfig['objectClass'], $cachedConfig);
         return $this->addConfig($config->disableOptionsValidation());
     }
 
@@ -126,10 +139,16 @@ class DataTypeManager implements IteratorAggregate, Arrayable
     protected function addDataType(DataTypeConfig $config): DataType
     {
         $options = $config->getOptions();
+        if ($extends = $config->getExtends()) {
+            $options = array_replace_recursive($this->findConfig($extends)->getOptions(), $options);
+        }
         $dataType = new DataType($options);
         $this->dataTypes[$dataType->getName()] = $dataType;
         if ($dataType->hasStore()) {
             $dataType->setStoreResolver($this->getStoreResolver());
+        }
+        if (!TransformerFactory::isSharedType($config->getName())) {
+            $this->addAttributeType($config->getName(), $config->getObjectClass());
         }
         if (filled($this->addDataTypeCallbacks)) {
             foreach ($this->addDataTypeCallbacks as $callback) {
@@ -142,7 +161,7 @@ class DataTypeManager implements IteratorAggregate, Arrayable
             $objectClass::setDataTypeManager($this);
         }
         $config->runAddDataType($dataType);
-        if ($this->dispatcher) {
+        if ($this->isDispatching()) {
             $this->dispatcher->dispatch(self::AFTER_ADD_DATATYPE, [$dataType]);
             $this->dispatcher->dispatch(self::AFTER_ADD_DATATYPE . ":{$dataType->getName()}", [$dataType]);
         }
@@ -153,6 +172,11 @@ class DataTypeManager implements IteratorAggregate, Arrayable
         return $dataType;
     }
 
+    public function addTypeRepository(DataTypeConfigCache $cache)
+    {
+        $this->configRepos[] = $cache;
+    }
+
     public function get(string $name): DataType
     {
         $name = $this->aliases[$name] ?? $name;
@@ -160,10 +184,15 @@ class DataTypeManager implements IteratorAggregate, Arrayable
             if (class_exists($name)) {
                 return $this->addDataType($this->addClass($name));
             }
-            throw new Error('Data type not found - ' . $name);
+            throw DataTypeException::notFound($name);
         }
 
         return $this->dataTypes[$name];
+    }
+
+    public function getAlias($type)
+    {
+        return array_search($type, $this->aliases) ?? $type;
     }
 
     public function getDataTypeNames()
@@ -182,6 +211,11 @@ class DataTypeManager implements IteratorAggregate, Arrayable
     public function getIterator()
     {
         return new ArrayIterator($this->dataTypes);
+    }
+
+    public function getNameFromAlias($name): string
+    {
+        return array_search($name, $this->aliases) ?: $name;
     }
 
     public function getObjectClass(string $name): string
@@ -233,29 +267,32 @@ class DataTypeManager implements IteratorAggregate, Arrayable
 
     public function init()
     {
-        if ($this->dispatcher) {
+        if ($this->isDispatching()) {
             $this->dispatcher->dispatch(self::ON_BEFORE_INIT, [$this]);
         }
 
+        $this->eventDispatchingEnabled = false;
+
         if ($this->registersProviders) {
             foreach ($this->configRepos as $provider)
-                foreach ($provider->getAllOptions() as $options) {
-                    $this->addConfigured($options);
+                foreach ($provider->getAllDataTypeConfigs() as $cachedConfig) {
+                    $this->addConfigured($cachedConfig);
                 }
         }
-
+        $nameMap = [];
         foreach ($this->configs as $config) {
-            $objectClass = $config->getObjectClass();
+            $nameMap[$config->getName()] = $config;
+        }
 
-            if (TransformerFactory::isSharedType($config->getName())) {
-                continue;
-            }
-            $this->addAttributeType($config->getName(), $objectClass);
+        $sort = $this->sorter->sort();
+
+        foreach ($sort as $name) {
+            $this->addDataType($nameMap[$name]);
         }
-        foreach ($this->configs as $config) {
-            $this->addDataType($config);
-        }
-        if ($this->dispatcher) {
+
+        $this->eventDispatchingEnabled = true;
+
+        if ($this->isDispatching()) {
             $this->dispatcher->dispatch(self::ON_INIT);
         }
         return $this;
@@ -360,5 +397,25 @@ class DataTypeManager implements IteratorAggregate, Arrayable
     public function toArray()
     {
         return $this->dataTypes;
+    }
+
+    /**
+     * @param string $name
+     * @return \Sayla\Objects\Builder\DataTypeConfig
+     * @throws \Sayla\Objects\Contract\Exception\DataTypeException
+     */
+    private function findConfig(string $name): DataTypeConfig
+    {
+        $name = $this->getNameFromAlias($name);
+        foreach ($this->configs as $config)
+            if ($config->getName() === $name) {
+                return $config;
+            }
+        throw new DataTypeException('Not found: ' . $name);
+    }
+
+    private function isDispatching()
+    {
+        return $this->dispatcher && $this->eventDispatchingEnabled;
     }
 }

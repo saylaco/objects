@@ -1,6 +1,8 @@
 <?php namespace Sayla\Objects\Transformers\Transformer;
 
-class DoubleTransformer extends IntTransformer
+use Sayla\Objects\Transformers\SmashesToNumber;
+
+class DoubleTransformer extends IntTransformer implements SmashesToNumber
 {
     /**
      * @param $value

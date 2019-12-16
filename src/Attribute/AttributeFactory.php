@@ -298,6 +298,13 @@ class AttributeFactory
         }
     }
 
+    public function setAttributeDescriptors(array $descriptors)
+    {
+        $this->normalized = false;
+        $this->descriptors = $descriptors;
+        return $this;
+    }
+
     /**
      * @param array $propertyTypeOptions
      * @return AttributeFactory

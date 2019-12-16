@@ -2,68 +2,49 @@
 
 namespace Sayla\Objects\Support\Illuminate\Eloquent;
 
+use Sayla\Objects\Contract\DataObject\LookableTrait;
+
 /**
  * @mixin \Sayla\Objects\Contract\DataObject\StorableObjectTrait
  * @method static EloquentStore getStore
+ * @method static EloquentLookup lookup
  */
 trait AsEloquentObject
 {
-    /**
-     * @return static[]
-     * @throws \Sayla\Objects\Contract\Exception\HydrationError
-     */
-    public static function all()
-    {
-        return self::dataType()->hydrateMany(static::query()->toBase()->get());
-    }
-
-    /**
-     * @param $id
-     * @return static
-     * @throws \Sayla\Objects\Contract\Exception\HydrationError
-     */
-    public static function find($id)
-    {
-        $model = static::query()->toBase()->find($id);
-        return $model
-            ? self::dataType()->hydrate($model)
-            : null;
-    }
+    use LookableTrait;
 
     public static function findAll(array $filter)
     {
-        $query = static::query();
-        $renamedData = self::dataType()->extract($filter);
-        $query->where($renamedData);
-        $results = $query->toBase()->get();
-        return self::dataType()->hydrateMany($results);
+        $data = static::dataType()->extract($filter);
+        return static::lookup()->getWhere($data);
     }
 
-    /**
-     * @param $id
-     * @return static
-     * @throws \Sayla\Objects\Contract\Exception\HydrationError
-     */
     public static function findOrFail($id)
     {
-        return self::dataType()->hydrate(static::query()->findOrFail($id));
-    }
-
-    public static function query()
-    {
-        return static::getStore()->getModel()->newQuery();
-    }
-
-    protected function determineExistence(): bool
-    {
-        return filled($this->id);
+        return static::lookup()->findOrFail($id);
     }
 
     /**
-     * @return mixed
+     * @return \Sayla\Objects\Support\Illuminate\Eloquent\EloquentObjectBuilder
      */
-    public function getKey()
+    public static function query()
     {
-        return $this->id;
+        return static::lookup()->newQuery();
+    }
+
+    public static function transaction(callable $callback, $attempts = 1)
+    {
+        return static::lookup()->getModel()->getConnection()->transaction($callback, $attempts);
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Model
+     */
+    protected function model()
+    {
+        $model = static::lookup()->getModel();
+        return $model->newInstance([
+            $model->getKeyName() => $this->getKey()
+        ]);
     }
 }

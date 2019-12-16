@@ -14,6 +14,7 @@ use Sayla\Support\Bindings\Contract\RunsOnBoot;
 
 class LaravelObjectsBindings extends ObjectsBindings implements RunsOnBoot
 {
+    private static $configureDataTypeManager = false;
 
     public function booting($container, $aliases): void
     {

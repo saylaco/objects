@@ -9,7 +9,7 @@ use Sayla\Objects\Contract\Attributes\SupportsCallableResolverTrait;
 use Sayla\Objects\DataObject;
 use Sayla\Objects\DataType\DataTypeManager;
 
-class Has implements AssociationResolver
+class HasMany implements AssociationResolver
 {
     use AssociationResolverTrait;
     use SupportsCallableResolverTrait;
@@ -26,9 +26,22 @@ class Has implements AssociationResolver
         }
     }
 
+    public function getLookupAttribute(): string
+    {
+        return $this->lookupAttribute ?? ($this->lookupAttribute = $this->guessOwnerAttrPrefix() . 'Id');
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getLookupValueAttribute(): string
+    {
+        return $this->lookupValueAttribute ?? ($this->lookupValueAttribute = 'id');
+    }
+
     public function isSingular(): bool
     {
-        return true;
+        return false;
     }
 
     /**
@@ -43,7 +56,7 @@ class Has implements AssociationResolver
             return $this->runCallable($owningObject);
         }
         return DataTypeManager::resolve()->getObjectLookup($this->associatedDataType)
-            ->findBy($this->getLookupAttribute(), $owningObject[$this->getLookupValueAttribute()]);
+            ->getWhere($this->getLookupAttribute(), $owningObject[$this->getLookupValueAttribute()]);
     }
 
     public function resolveMany($objects): array

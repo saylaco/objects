@@ -29,7 +29,7 @@ class Transform implements AttributePropertyType
                 /** @var TransformationDescriptorMixin|\Sayla\Objects\DataType\DataTypeDescriptor $descriptor */
                 $descriptor = $context->descriptor;
                 $transformer = $descriptor->getTransformer()->skipNonAttributes();
-                $attributes =  $transformer->smashAll($context->attributes);
+                $attributes = $transformer->smashAll($context->attributes);
                 $context->attributes = $attributes;
                 return $next($context);
             },
@@ -73,6 +73,9 @@ class Transform implements AttributePropertyType
             } else {
                 $value['type'] = $attributeType;
             }
+        }
+        if (!isset($value['varType'])) {
+            $value['varType'] = null;
         }
         return $value;
     }

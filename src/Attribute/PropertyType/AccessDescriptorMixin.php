@@ -35,21 +35,21 @@ class AccessDescriptorMixin implements Mixin
 
     public function isHidden(string $attributeName): bool
     {
-        return $this->access[$attributeName]['hidden'];
+        return $this->access[$attributeName]['hidden'] ?? false;
     }
 
     public function isReadable(string $attributeName): bool
     {
-        return $this->access[$attributeName]['readable'];
+        return $this->access[$attributeName]['readable'] ?? false;
     }
 
     public function isVisible(string $attributeName)
     {
-        return $this->access[$attributeName]['visible'];
+        return $this->access[$attributeName]['visible'] ?? false;
     }
 
     public function isWritable(string $attributeName): bool
     {
-        return $this->access[$attributeName]['writable'];
+        return $this->access[$attributeName]['writable'] ?? false;
     }
 }

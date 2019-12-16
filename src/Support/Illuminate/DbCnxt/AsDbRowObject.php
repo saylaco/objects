@@ -7,6 +7,7 @@ use Sayla\Objects\Contract\DataObject\LookableTrait;
 /**
  * @mixin \Sayla\Objects\Contract\DataObject\StorableObjectTrait
  * @method static DbTableStore getStore
+ * @method static TableLookup lookup
  */
 trait AsDbRowObject
 {
@@ -25,21 +26,4 @@ trait AsDbRowObject
         return static::lookup()->findOrFail($id);
     }
 
-    public static function lookup()
-    {
-        return static::getStore()->lookup();
-    }
-
-    protected function determineExistence(): bool
-    {
-        return !empty($this->getKey());
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getKey()
-    {
-        return $this->getAttributeValue(self::getStore()->getKeyName());
-    }
 }

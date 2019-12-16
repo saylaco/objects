@@ -51,7 +51,7 @@ trait TriggerableTrait
                     unset($this->triggers[$name][$i]);
                 } catch (Throwable $exception) {
                     $fullTriggerName = $dataTypeName . '.*' . $name;
-                    throw new TriggerError($fullTriggerName, $exception);
+                    throw new TriggerError($fullTriggerName.' - '.$exception->getMessage(), $exception);
                 }
             }
         }

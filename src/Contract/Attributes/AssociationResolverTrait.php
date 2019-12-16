@@ -2,6 +2,8 @@
 
 namespace Sayla\Objects\Contract\Attributes;
 
+use Illuminate\Support\Str;
+
 trait AssociationResolverTrait
 {
     /** @var string */
@@ -35,7 +37,8 @@ trait AssociationResolverTrait
      */
     public function getLookupValueAttribute(): string
     {
-        return $this->lookupValueAttribute ?? ($this->lookupValueAttribute = $this->getAttribute() . 'Id');
+        return $this->lookupValueAttribute
+            ?? ($this->lookupValueAttribute = $this->guessOwnerAttrPrefix() . 'Id');
     }
 
     /**
@@ -46,5 +49,21 @@ trait AssociationResolverTrait
     {
         $this->lookupValueAttribute = $lookupValueAttribute;
         return $this;
+    }
+
+    /**
+     * @return string
+     */
+    protected function guessAssociatedAttrPrefix(): string
+    {
+        return Str::camel(Str::singular(class_basename($this->getAssociatedDataType())));
+    }
+
+    /**
+     * @return string
+     */
+    protected function guessOwnerAttrPrefix(): string
+    {
+        return Str::camel(Str::singular(class_basename($this->getOwningObjectClass())));
     }
 }

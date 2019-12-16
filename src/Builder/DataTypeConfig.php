@@ -3,6 +3,7 @@
 namespace Sayla\Objects\Builder;
 
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Support\Str;
 use Sayla\Objects\Contract\DataObject\ResponsableObject;
 use Sayla\Objects\DataType\DataType;
 use Sayla\Objects\ObjectDispatcher;
@@ -46,11 +47,24 @@ class DataTypeConfig
         if (empty($this->options['name'])) {
             $this->options['name'] = $objectClass;
         }
+        if (empty($this->options['alias'])) {
+            $alias = $this->options['name'];
+            $this->options['alias'] = self::makeAlias($alias);
+        }
     }
 
     public static function addOptionSet(array $matcher, array $options)
     {
         self::$optionSets[] = compact('matcher', 'options');
+    }
+
+    /**
+     * @param $alias
+     * @return mixed
+     */
+    protected static function makeAlias($alias): string
+    {
+        return str_replace('\\', '', Str::after($alias, 'Model\\') ?: $alias);
     }
 
     /**
@@ -132,9 +146,21 @@ class DataTypeConfig
         return $this;
     }
 
-    public function getAlias(): ?string
+    public function extends(?string $extends)
     {
-        return $this->options['alias'] ?? null;
+        $this->options[__FUNCTION__] = $extends;
+        return $this;
+    }
+
+    public function getExtends(): ?string
+    {
+        return $this->options['extends'] ?? null;
+    }
+
+
+    public function getAlias(): string
+    {
+        return $this->options['alias'];
     }
 
     public function getName(): string
@@ -181,6 +207,7 @@ class DataTypeConfig
         }
         return $options;
     }
+
 
     /**
      * @return array
@@ -284,8 +311,14 @@ class DataTypeConfig
             $resolver->setDefined('store');
             $resolver->setAllowedTypes('store', 'array');
 
+            $resolver->setDefault('extends', null);
+            $resolver->setAllowedTypes('extends', ['string', 'null']);
+
             $resolver->setDefault('classFile', null);
             $resolver->setAllowedTypes('classFile', ['string', 'null']);
+
+            $resolver->setDefault('definitionFile', null);
+            $resolver->setAllowedTypes('definitionFile', ['string', 'null']);
 
             $resolver->setDefaults(['traits' => []]);
             $resolver->setAllowedTypes('traits', 'array');
@@ -297,8 +330,12 @@ class DataTypeConfig
                 return $options['objectClass'];
             });
             $resolver->setAllowedTypes('name', 'string');
+
             $resolver->setDefault('alias', function (Options $options) {
-                return class_basename($options['objectClass']);
+                return self::makeAlias(class_basename($options['objectClass']));
+            });
+            $resolver->setNormalizer('alias', function (Options $options, $value) {
+                return str_replace('\\', '', $value);
             });
             $resolver->setAllowedTypes('alias', 'string');
             $this->optionsResolver = $resolver;

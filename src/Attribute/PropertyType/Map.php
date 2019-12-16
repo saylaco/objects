@@ -89,6 +89,10 @@ class Map implements AttributePropertyType, DefinesOptions, ModifiesAttributeDes
         if (isset($descriptorData[self::NAME]) && $descriptorData[self::NAME] === true) {
             return $value;
         }
+
+        if (isset($descriptorData[self::NAME]) && is_string($descriptorData[self::NAME])) {
+            $value = ['to' => $descriptorData[self::NAME], 'from' => $descriptorData[self::NAME]];
+        }
         if (isset($descriptorData[self::NAME]) && is_array($descriptorData[self::NAME])) {
             $value = array_merge($value, $descriptorData[self::NAME]);
         }

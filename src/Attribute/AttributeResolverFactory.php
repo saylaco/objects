@@ -5,6 +5,7 @@ namespace Sayla\Objects\Attribute;
 use Illuminate\Support\Traits\Macroable;
 use Sayla\Objects\Attribute\Resolver\EnumResolver;
 use Sayla\Objects\Attribute\Resolver\Has;
+use Sayla\Objects\Attribute\Resolver\HasMany;
 
 class AttributeResolverFactory
 {
@@ -17,7 +18,7 @@ class AttributeResolverFactory
 
     public function hasMany(string $associatedDataType, string $lookupValueAttr = null, string $lookupAttr = null)
     {
-        return (new Has($associatedDataType, $lookupAttr, $lookupValueAttr))->multiple();
+        return (new HasMany($associatedDataType, $lookupAttr, $lookupValueAttr));
     }
 
     public function hasOne(string $associatedDataType, string $lookupValueAttr = null, string $lookupAttr = null)

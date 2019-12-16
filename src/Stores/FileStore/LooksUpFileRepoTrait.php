@@ -9,26 +9,14 @@ use Sayla\Objects\Stores\FileStore;
  * Trait LooksUpFileRepoTrait
  * @mixin \Sayla\Objects\Contract\DataObject\StorableObjectTrait
  * @method static FileStore\FileDataStore getStore()
+ * @method static ObjectCollectionLookup lookup
  */
 trait LooksUpFileRepoTrait
 {
     use LookableTrait;
 
-    /**
-     * @return \Sayla\Objects\Stores\FileStore\ObjectCollectionLookup
-     */
-    public static function lookup()
-    {
-        return static::getStore()->lookup();
-    }
-
     protected function determineExistence(): bool
     {
-        return filled($this->getKey()) && static::getStore()->exists($this->getKey());
-    }
-
-    public function getKey()
-    {
-        return $this[static::getStore()->getPrimaryKey()];
+        return filled($this->getKey()) && static::lookup()->exists($this->getKey());
     }
 }

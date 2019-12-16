@@ -2,10 +2,11 @@
 
 namespace Sayla\Objects\Transformers\Transformer;
 
+use Sayla\Objects\Transformers\SmashesToNumber;
 use Sayla\Objects\Transformers\ValueTransformer;
 use Sayla\Objects\Transformers\ValueTransformerTrait;
 
-class NumberTransformer implements ValueTransformer
+class NumberTransformer implements ValueTransformer, SmashesToNumber
 {
     use ValueTransformerTrait;
 

@@ -18,33 +18,22 @@ use Sayla\Objects\Stores\StoreManager;
 class ClassWriter
 {
     private static $reflectionClasses = [];
-    protected $classNamespace;
-    protected $codeOutputDirectory;
-    private $descriptorClassSuffix = 'Descriptor';
+    private $descriptorClassSuffix = 'DTDescriptor';
     private $interfaceSuffix = 'DT';
     /** @var \Sayla\Objects\Stores\StoreManager */
     private $storeManager;
-    private $traitSuffix = 'Trait';
-
-    /**
-     * ClassWriter constructor.
-     * @param $classNamespace
-     * @param $codeOutputDirectory
-     */
-    public function __construct(string $classNamespace, string $codeOutputDirectory)
-    {
-        $this->classNamespace = new PhpNamespace($classNamespace);
-        $this->codeOutputDirectory = $codeOutputDirectory;
-    }
+    private $traitSuffix = 'DTrait';
 
     public function __invoke(DataType $dataType)
     {
         $descriptor = $dataType->getDescriptor();
-        $descriptorClass = $this->writeDescriptorClass($descriptor);
-        $classes = $this->writeObjectClass($dataType, $descriptorClass->getName());
+        $baseName = class_basename($dataType->getObjectClass());
+        $namespace = class_parent_namespace($dataType->getObjectClass());
+        $ns = $this->getPhpNamespace($namespace);
+        $descriptorClass = $this->writeDescriptorClass($descriptor, $ns, $baseName);
+        $classes = $this->writeObjectClass($dataType, $ns, $baseName, $descriptorClass->getName());
         $classes['desc'] = $descriptorClass;
-        $this->createFile($classes['dt']);
-        $this->createFile($classes['trait'], $classes['desc']);
+        $this->createFile($dataType->getDefinitionFile(), $ns, $classes['dt'], $classes['trait'], $classes['desc']);
     }
 
     /**
@@ -58,25 +47,36 @@ class ClassWriter
         /** @var \Sayla\Objects\Attribute\PropertyType\TransformationDescriptorMixin $transformerMixin */
         $descriptor = $dataType->getDescriptor();
         foreach ($descriptor->getVarTypes() as $attributeName => $varTypes) {
+            $varTypeStr = join('|', $varTypes);
             if (!$descriptor->isWritable($attributeName) && $descriptor->isReadable($attributeName)) {
-                $class->addComment('@property-read ' . join('|', $varTypes) . ' ' . $attributeName);
+                $class->addComment('@property-read ' . $varTypeStr . ' ' . $attributeName);
             } else if ($descriptor->isWritable($attributeName) && !$descriptor->isReadable($attributeName)) {
-                $class->addComment('@property-write ' . join('|', $varTypes) . ' ' . $attributeName);
+                $class->addComment('@property-write ' . $varTypeStr . ' ' . $attributeName);
             } else {
-                $class->addComment('@property ' . join('|', $varTypes) . ' ' . $attributeName);
+                $class->addComment('@property ' . $varTypeStr . ' ' . $attributeName);
             }
         }
     }
 
-    protected function createFile(ClassType ...$classes): void
+    protected function createFile(string $fileName, PhpNamespace $namespace, ClassType ...$classes): void
     {
         $printer = new PsrPrinter();
         $code = '<?php ' . PHP_EOL
-            . $printer->printNamespace($this->classNamespace) . PHP_EOL;
+            . $printer->printNamespace($namespace) . PHP_EOL;
         foreach ($classes as $class) {
             $code .= $printer->printClass($class) . PHP_EOL;
         }
-        file_put_contents("{$this->codeOutputDirectory}/{$classes[0]->getName()}.php", $code);
+        file_put_contents($fileName, $code);
+    }
+
+    /**
+     * @param string $namespace
+     * @return \Nette\PhpGenerator\PhpNamespace|string
+     */
+    protected function getPhpNamespace(string $namespace)
+    {
+        $namespace = new PhpNamespace($namespace);
+        return $namespace;
     }
 
     /**
@@ -127,10 +127,10 @@ class ClassWriter
         return $this;
     }
 
-    protected function writeDescriptorClass(DataTypeDescriptor $descriptor): ClassType
+    protected function writeDescriptorClass(DataTypeDescriptor $descriptor, PhpNamespace $namespace,
+                                            string $className): ClassType
     {
-        $className = $this->normalizeClassName($descriptor->getObjectClass(), $this->descriptorClassSuffix);
-        $class = new ClassType($className, $this->classNamespace);
+        $class = new ClassType($className . $this->descriptorClassSuffix, $namespace);
         $class->setFinal(true)->setExtends(qualify_var_type(DataTypeDescriptor::class));
         $annotatedMixins = [];
         foreach ($descriptor->getMixins()->getMixinMethods() as $mixin) {
@@ -143,17 +143,21 @@ class ClassWriter
 
     /**
      * @param \Sayla\Objects\DataType\DataType $dataType
+     * @param \Nette\PhpGenerator\PhpNamespace $namespace
+     * @param string $className
      * @param string $descriptorClass
      * @return ClassType[]
      * @throws \ErrorException
+     * @throws \ReflectionException
      * @throws \Sayla\Exception\Error
      */
-    protected function writeObjectClass(DataType $dataType, string $descriptorClass): array
+    protected function writeObjectClass(DataType $dataType, PhpNamespace $namespace, string $className,
+                                        string $descriptorClass): array
     {
         $classes = [];
         $classes['dt'] = $interface = new ClassType(
-            $this->normalizeClassName($dataType->getName(), $this->interfaceSuffix),
-            $this->classNamespace
+            $className . $this->interfaceSuffix,
+            $namespace
         );
         $interface->setType(ClassType::TYPE_INTERFACE);
 
@@ -164,8 +168,8 @@ class ClassWriter
         }
 
         $classes['trait'] = $trait = new ClassType(
-            $this->normalizeClassName($dataType->getName(), $this->traitSuffix),
-            $this->classNamespace
+            $className . $this->traitSuffix,
+            $namespace
         );
         $trait->setType(ClassType::TYPE_TRAIT);
         $trait->addMethod('dataTypeName')
@@ -209,6 +213,11 @@ class ClassWriter
         if ($dataType->getDescriptor()->hasMixin(TransformationDescriptorMixin::class)) {
             $this->addAttributeAnnotations($dataType, $trait);
             $this->addAttributeAnnotations($dataType, $interface);
+            $attributeNames = $dataType->getAttributes()->getNames();
+            sort($attributeNames);
+            $interface->addConstant('Attributes', $attributeNames);
+            foreach ($attributeNames as $name)
+                $interface->addConstant(ucfirst($name), $name);
         }
         return $classes;
     }
@@ -226,15 +235,4 @@ class ClassWriter
         return self::$reflectionClasses[$class] ?? self::$reflectionClasses[$class] = new ReflectionClass($class);
     }
 
-    /**
-     * @param string $possibleClassName
-     * @param string $suffix
-     * @return string
-     */
-    private function normalizeClassName(string $possibleClassName, string $suffix): string
-    {
-        $_className = $possibleClassName . $suffix;
-        $className = class_basename($_className) ?? $_className;
-        return $className;
-    }
 }

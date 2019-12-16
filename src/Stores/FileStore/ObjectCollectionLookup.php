@@ -7,7 +7,6 @@ use Sayla\Objects\Contract\DataObject\SupportsDataTypeManagerTrait;
 use Sayla\Objects\Contract\Stores\Lookup;
 use Sayla\Objects\DataType\DataType;
 use Sayla\Objects\DataType\DataTypeManager;
-use Sayla\Objects\ObjectCollection;
 
 class ObjectCollectionLookup implements Lookup, SupportsDataTypeManager
 {
@@ -39,10 +38,16 @@ class ObjectCollectionLookup implements Lookup, SupportsDataTypeManager
      */
     public function all()
     {
-        return self::getDataTypeManager()->get($this->dataType)
+        return self::getDataTypeManager()
+            ->get($this->dataType)
             ->newCollection()
             ->useKey($this->keyAttribute)
             ->makeObjects($this->records);
+    }
+
+    public function exists(string $key): bool
+    {
+        return isset($this->records[$key]);
     }
 
     /**
@@ -68,6 +73,14 @@ class ObjectCollectionLookup implements Lookup, SupportsDataTypeManager
     }
 
     /**
+     * @return string
+     */
+    public function getKeyName(): string
+    {
+        return $this->keyAttribute;
+    }
+
+    /**
      * @param $attribute
      * @param $key
      * @return \Sayla\Objects\ObjectCollection
@@ -85,13 +98,5 @@ class ObjectCollectionLookup implements Lookup, SupportsDataTypeManager
     private function getDataType(): DataType
     {
         return DataTypeManager::resolve()->get($this->dataType);
-    }
-
-    /**
-     * @return string
-     */
-    public function getKeyName(): string
-    {
-        return $this->keyAttribute;
     }
 }

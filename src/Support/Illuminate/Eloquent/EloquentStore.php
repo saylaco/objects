@@ -14,6 +14,8 @@ use Symfony\Component\OptionsResolver\Options;
 class EloquentStore implements ObjectStore, ConfigurableStore, ModifiesObjectBehavior
 {
     const STORE_NAME = 'Eloquent';
+    /** @var \Sayla\Objects\DataType\DataType */
+    protected $dataType;
     /** @var Model */
     protected $model;
     protected $useTransactions = false;
@@ -36,7 +38,7 @@ class EloquentStore implements ObjectStore, ConfigurableStore, ModifiesObjectBeh
     public static function getObjectBehavior(): array
     {
         return [
-            AsEloquentObject::class
+            AsEloquentObject::class,
         ];
     }
 
@@ -115,10 +117,16 @@ class EloquentStore implements ObjectStore, ConfigurableStore, ModifiesObjectBeh
         return $this->model;
     }
 
+    public function lookup()
+    {
+        return new EloquentLookup($this->dataType, $this->model);
+    }
+
     public function setOptions(string $name, array $options): void
     {
         $this->model = $options['model'] ?? $name;
         $this->useTransactions = $options['useTransactions'];
+        $this->dataType = $options['dataType'];
     }
 
     /**

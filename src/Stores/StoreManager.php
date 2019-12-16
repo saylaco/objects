@@ -7,9 +7,11 @@ use Illuminate\Contracts\Container\Container;
 use InvalidArgumentException;
 use Sayla\Objects\Contract\Stores\ConfigurableStore;
 use Sayla\Objects\Contract\Stores\ObjectStore;
+use Sayla\Objects\DataType\DataTypeManager;
 use Sayla\Objects\Stores\FileStore\FileDataStore;
 use Sayla\Objects\Stores\FileStore\ReadFileDataStore;
 use Sayla\Support\Bindings\ResolvesSelf;
+use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class StoreManager
@@ -159,6 +161,9 @@ class StoreManager
                 $resolver = new OptionsResolver();
                 $resolver->setRequired('name');
                 $resolver->setRequired('objectClass');
+                $resolver->setDefault('dataType', function(Options $options){
+                    return DataTypeManager::resolve()->get($options['name']);
+                });
                 $store::defineOptions($resolver);
                 $this->driverOptionResolvers[$driver] = $resolver;
             }
